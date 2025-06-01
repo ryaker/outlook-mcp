@@ -2,8 +2,7 @@
  * Authentication-related tools for the Outlook MCP server
  */
 const config = require('../config');
-const tokenManager = require('./token-manager');
-
+const TokenStorage = require('./token-storage');
 /**
  * About tool handler
  * @returns {object} - MCP response
@@ -24,23 +23,10 @@ async function handleAbout() {
  */
 async function handleAuthenticate(args) {
   const force = args && args.force === true;
-  
-  // For test mode, create a test token
-  if (config.USE_TEST_MODE) {
-    // Create a test token with a 1-hour expiry
-    tokenManager.createTestTokens();
-    
-    return {
-      content: [{
-        type: "text",
-        text: 'Successfully authenticated with Microsoft Graph API (test mode)'
-      }]
-    };
-  }
-  
+
   // For real authentication, generate an auth URL and instruct the user to visit it
   const authUrl = `${config.AUTH_CONFIG.authServerUrl}/auth?client_id=${config.AUTH_CONFIG.clientId}`;
-  
+
   return {
     content: [{
       type: "text",
@@ -55,22 +41,23 @@ async function handleAuthenticate(args) {
  */
 async function handleCheckAuthStatus() {
   console.error('[CHECK-AUTH-STATUS] Starting authentication status check');
-  
-  const tokens = tokenManager.loadTokenCache();
-  
+
+  const tokenStorage = new TokenStorage();
+  const tokens = await tokenStorage.loadTokens();
+
   console.error(`[CHECK-AUTH-STATUS] Tokens loaded: ${tokens ? 'YES' : 'NO'}`);
-  
+
   if (!tokens || !tokens.access_token) {
     console.error('[CHECK-AUTH-STATUS] No valid access token found');
     return {
       content: [{ type: "text", text: "Not authenticated" }]
     };
   }
-  
+
   console.error('[CHECK-AUTH-STATUS] Access token present');
   console.error(`[CHECK-AUTH-STATUS] Token expires at: ${tokens.expires_at}`);
   console.error(`[CHECK-AUTH-STATUS] Current time: ${Date.now()}`);
-  
+
   return {
     content: [{ type: "text", text: "Authenticated and ready" }]
   };

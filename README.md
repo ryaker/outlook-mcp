@@ -110,6 +110,17 @@ You can test the server using:
 
 This will use the MCP Inspector to directly connect to the server and let you test the available tools.
 
+## SSE Mode
+
+To run the server in SSE mode, use the following command:
+
+```
+node sse-server.js
+```
+
+This will start the server in SSE mode. The SSE server also integrates with the auth endpoint and handles
+auth callbacks.
+
 ## Authentication Flow
 
 1. Start a local authentication server on port 3333 (using `outlook-auth-server.js`)

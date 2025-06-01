@@ -5,8 +5,10 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "sse": "node sse-server.js",
     "auth-server": "node outlook-auth-server.js",
     "test-mode": "USE_TEST_MODE=true node index.js",
+    "sse-test-mode": "USE_TEST_MODE=true node sse-server.js",
     "inspect": "npx @modelcontextprotocol/inspector node index.js"
   },
   "keywords": [
@@ -23,7 +25,8 @@
     "dotenv": "^16.5.0"
   },
   "devDependencies": {
-    "@modelcontextprotocol/inspector": "^0.10.2"
+    "@modelcontextprotocol/inspector": "^0.10.2",
+    "@types/express": "^5.0.1"
   },
   "engines": {
     "node": ">=14.0.0"
