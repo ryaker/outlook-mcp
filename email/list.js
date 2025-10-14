@@ -4,6 +4,7 @@
 const config = require('../config');
 const { callGraphAPI } = require('../utils/graph-api');
 const { ensureAuthenticated } = require('../auth');
+const { resolveFolderPath } = require('./folder-utils');
 
 /**
  * List emails handler
@@ -17,21 +18,9 @@ async function handleListEmails(args) {
   try {
     // Get access token
     const accessToken = await ensureAuthenticated();
-    
-    // Build API endpoint
-    let endpoint = 'me/messages';
-    if (folder.toLowerCase() !== 'inbox') {
-      // Get folder ID first if not inbox
-      const folderResponse = await callGraphAPI(
-        accessToken, 
-        'GET', 
-        `me/mailFolders?$filter=displayName eq '${folder}'`
-      );
-      
-      if (folderResponse.value && folderResponse.value.length > 0) {
-        endpoint = `me/mailFolders/${folderResponse.value[0].id}/messages`;
-      }
-    }
+
+    // Resolve the folder path
+    const endpoint = await resolveFolderPath(accessToken, folder);
     
     // Add query parameters
     const queryParams = {

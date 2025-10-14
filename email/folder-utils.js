@@ -16,28 +16,28 @@ const folderCache = {};
  * @returns {Promise<string>} - Resolved endpoint path
  */
 async function resolveFolderPath(accessToken, folderName) {
-  // Default to inbox if no folder specified
-  if (!folderName) {
-    return 'me/messages';
-  }
-  
   // Handle well-known folder names
   const wellKnownFolders = {
-    'inbox': 'me/messages',
+    'inbox': 'me/mailFolders/inbox/messages',
     'drafts': 'me/mailFolders/drafts/messages',
     'sent': 'me/mailFolders/sentItems/messages',
     'deleted': 'me/mailFolders/deletedItems/messages',
     'junk': 'me/mailFolders/junkemail/messages',
     'archive': 'me/mailFolders/archive/messages'
   };
-  
+
+  // Default to inbox if no folder specified
+  if (!folderName) {
+    return wellKnownFolders['inbox'];
+  }
+
   // Check if it's a well-known folder (case-insensitive)
   const lowerFolderName = folderName.toLowerCase();
   if (wellKnownFolders[lowerFolderName]) {
     console.error(`Using well-known folder path for "${folderName}"`);
     return wellKnownFolders[lowerFolderName];
   }
-  
+
   try {
     // Try to find the folder by name
     const folderId = await getFolderIdByName(accessToken, folderName);
@@ -46,13 +46,13 @@ async function resolveFolderPath(accessToken, folderName) {
       console.error(`Resolved folder "${folderName}" to path: ${path}`);
       return path;
     }
-    
+
     // If not found, fall back to inbox
     console.error(`Couldn't find folder "${folderName}", falling back to inbox`);
-    return 'me/messages';
+    return wellKnownFolders['inbox'];
   } catch (error) {
     console.error(`Error resolving folder "${folderName}": ${error.message}`);
-    return 'me/messages';
+    return wellKnownFolders['inbox'];
   }
 }
 
