@@ -6,6 +6,10 @@ on:
 
 jobs:
   claude-review:
+    # Skip fork PRs since the action can't checkout fork branches
+    # Users can still use @claude mentions to get reviews on fork PRs
+    if: github.event.pull_request.head.repo.full_name == github.repository
+
     runs-on: ubuntu-latest
     permissions:
       contents: read
