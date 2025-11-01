@@ -32,44 +32,55 @@ async function callGraphAPI(accessToken, method, path, data = null, queryParams 
       console.error(`Using full URL from nextLink: ${finalUrl}`);
     } else {
       // Build URL from path and queryParams
-      // Encode path segments properly
-      const encodedPath = path.split('/')
+      // Split path and any existing query string to avoid double-encoding
+      const [rawPath, rawQuery] = path.split('?');
+      const encodedPath = rawPath.split('/')
         .map(segment => encodeURIComponent(segment))
         .join('/');
-      
-      // Build query string from parameters with special handling for OData filters
-      let queryString = '';
-      if (Object.keys(queryParams).length > 0) {
-        // Handle $filter parameter specially to ensure proper URI encoding
-        const filter = queryParams.$filter;
-        if (filter) {
-          delete queryParams.$filter; // Remove from regular params
-        }
-        
-        // Build query string with proper encoding for regular params
-        const params = new URLSearchParams();
-        for (const [key, value] of Object.entries(queryParams)) {
-          params.append(key, value);
-        }
-        
-        queryString = params.toString();
-        
-        // Add filter parameter separately with proper encoding
-        if (filter) {
-          if (queryString) {
-            queryString += `&$filter=${encodeURIComponent(filter)}`;
+
+      const params = new URLSearchParams();
+      let filter;
+      let filterPreEncoded = false;
+
+      // Process existing query string from path
+      if (rawQuery) {
+        const existingParams = new URLSearchParams(rawQuery);
+        for (const [key, value] of existingParams.entries()) {
+          if (key === '$filter') {
+            filter = value;
+            filterPreEncoded = true;
           } else {
-            queryString = `$filter=${encodeURIComponent(filter)}`;
+            params.append(key, value);
           }
         }
-        
-        if (queryString) {
-          queryString = '?' + queryString;
-        }
-        
-        console.error(`Query string: ${queryString}`);
       }
-      
+
+      // Process queryParams object (these override path params)
+      if (queryParams && Object.keys(queryParams).length > 0) {
+        const { $filter, ...rest } = queryParams;
+        if ($filter !== undefined) {
+          filter = $filter;
+          filterPreEncoded = false;
+        }
+        for (const [key, value] of Object.entries(rest)) {
+          params.append(key, value);
+        }
+      }
+
+      // Build final query string
+      let queryString = params.toString();
+      if (queryString) {
+        queryString = `?${queryString}`;
+      }
+
+      // Add filter parameter with proper encoding
+      if (filter !== undefined) {
+        const separator = queryString ? '&' : '?';
+        const encodedFilter = filterPreEncoded ? filter : encodeURIComponent(filter);
+        queryString += `${separator}$filter=${encodedFilter}`;
+      }
+
+      console.error(`Query string: ${queryString}`);
       finalUrl = `${config.GRAPH_API_ENDPOINT}${encodedPath}${queryString}`;
       console.error(`Full URL: ${finalUrl}`);
     }
@@ -142,16 +153,25 @@ async function callGraphAPIPaginated(accessToken, method, path, queryParams = {}
   let nextLink = null;
   let currentUrl = path;
   let currentParams = queryParams;
+  let pageCount = 0;
 
   try {
     do {
+      pageCount++;
+
+      // Safeguard against infinite loops
+      if (pageCount > config.MAX_PAGINATION_PAGES) {
+        console.error(`Pagination: Reached max page limit of ${config.MAX_PAGINATION_PAGES}, stopping.`);
+        break;
+      }
+
       // Make API call
       const response = await callGraphAPI(accessToken, method, currentUrl, null, currentParams);
-      
+
       // Add items from this page
       if (response.value && Array.isArray(response.value)) {
         allItems.push(...response.value);
-        console.error(`Pagination: Retrieved ${response.value.length} items, total so far: ${allItems.length}`);
+        console.error(`Pagination: Retrieved ${response.value.length} items on page ${pageCount}, total so far: ${allItems.length}`);
       }
 
       // Check if we've reached the desired count
@@ -162,12 +182,12 @@ async function callGraphAPIPaginated(accessToken, method, path, queryParams = {}
 
       // Get next page URL
       nextLink = response['@odata.nextLink'];
-      
+
       if (nextLink) {
         // Pass the full nextLink URL directly to callGraphAPI
         currentUrl = nextLink;
         currentParams = {}; // nextLink already contains all params
-        console.error(`Pagination: Following nextLink, ${allItems.length} items so far`);
+        console.error(`Pagination: Following nextLink (page ${pageCount}), ${allItems.length} items so far`);
       }
     } while (nextLink);
 

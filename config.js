@@ -41,6 +41,9 @@ module.exports = {
   // Pagination
   DEFAULT_PAGE_SIZE: 25,
   MAX_RESULT_COUNT: 50,
+  API_PAGE_SIZE: 50, // Items per API call for efficient pagination
+  MAX_PAGINATION_PAGES: 100, // Safeguard against infinite loops
+  MAX_TOTAL_RESULTS: 1000, // Maximum total results to prevent excessive API calls
 
   // Timezone
   DEFAULT_TIMEZONE: "Central European Standard Time",

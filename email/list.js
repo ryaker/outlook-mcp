@@ -12,34 +12,41 @@ const { ensureAuthenticated } = require('../auth');
  */
 async function handleListEmails(args) {
   const folder = args.folder || "inbox";
-  const requestedCount = args.count || 10;
-  
+
+  // Parse and validate count with proper error handling
+  const parsedCount = parseInt(args.count, 10);
+  const defaultCount = 10;
+  const validCount = (Number.isNaN(parsedCount) || parsedCount <= 0) ? defaultCount : parsedCount;
+
+  // Cap to reasonable maximum to prevent excessive API calls
+  const requestedCount = Math.min(validCount, config.MAX_TOTAL_RESULTS);
+
   try {
     // Get access token
     const accessToken = await ensureAuthenticated();
-    
+
     // Build API endpoint
     let endpoint = 'me/messages';
     if (folder.toLowerCase() !== 'inbox') {
       // Get folder ID first if not inbox
       const folderResponse = await callGraphAPI(
-        accessToken, 
-        'GET', 
+        accessToken,
+        'GET',
         `me/mailFolders?$filter=displayName eq '${folder}'`
       );
-      
+
       if (folderResponse.value && folderResponse.value.length > 0) {
         endpoint = `me/mailFolders/${folderResponse.value[0].id}/messages`;
       }
     }
-    
-    // Add query parameters
+
+    // Add query parameters with safe page size (at least 1, capped at API_PAGE_SIZE)
     const queryParams = {
-      $top: Math.min(50, requestedCount), // Use 50 per page for efficiency
+      $top: Math.max(1, Math.min(config.API_PAGE_SIZE, requestedCount)),
       $orderby: 'receivedDateTime desc',
       $select: config.EMAIL_SELECT_FIELDS
     };
-    
+
     // Make API call with pagination support
     const response = await callGraphAPIPaginated(accessToken, 'GET', endpoint, queryParams, requestedCount);
     

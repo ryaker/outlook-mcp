@@ -2,7 +2,7 @@
  * Improved search emails functionality
  */
 const config = require('../config');
-const { callGraphAPI, callGraphAPIPaginated } = require('../utils/graph-api');
+const { callGraphAPIPaginated } = require('../utils/graph-api');
 const { ensureAuthenticated } = require('../auth');
 const { resolveFolderPath } = require('./folder-utils');
 
@@ -13,7 +13,15 @@ const { resolveFolderPath } = require('./folder-utils');
  */
 async function handleSearchEmails(args) {
   const folder = args.folder || "inbox";
-  const requestedCount = args.count || 10;
+
+  // Parse and validate count with proper error handling
+  const parsedCount = parseInt(args.count, 10);
+  const defaultCount = 10;
+  const validCount = (Number.isNaN(parsedCount) || parsedCount <= 0) ? defaultCount : parsedCount;
+
+  // Cap to reasonable maximum to prevent excessive API calls
+  const requestedCount = Math.min(validCount, config.MAX_TOTAL_RESULTS);
+
   const query = args.query || '';
   const from = args.from || '';
   const to = args.to || '';
@@ -75,10 +83,12 @@ async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms
   
   // 1. Try combined search (most specific)
   try {
-    const params = buildSearchParams(searchTerms, filterTerms, Math.min(50, maxCount));
+    // Compute safe page size: use API_PAGE_SIZE when maxCount is 0 (unlimited)
+    const topCount = maxCount > 0 ? Math.min(config.API_PAGE_SIZE, maxCount) : config.API_PAGE_SIZE;
+    const params = buildSearchParams(searchTerms, filterTerms, topCount);
     console.error("Attempting combined search with params:", params);
     searchAttempts.push("combined-search");
-    
+
     const response = await callGraphAPIPaginated(accessToken, 'GET', endpoint, params, maxCount);
     if (response.value && response.value.length > 0) {
       console.error(`Combined search successful: found ${response.value.length} results`);
@@ -87,19 +97,21 @@ async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms
   } catch (error) {
     console.error(`Combined search failed: ${error.message}`);
   }
-  
+
   // 2. Try each search term individually, starting with most specific
   const searchPriority = ['subject', 'from', 'to', 'query'];
-  
+
   for (const term of searchPriority) {
     if (searchTerms[term]) {
       try {
         console.error(`Attempting search with only ${term}: "${searchTerms[term]}"`);
         searchAttempts.push(`single-term-${term}`);
-        
+
         // For single term search, only use $search with that term
+        // Compute safe page size: use API_PAGE_SIZE when maxCount is 0 (unlimited)
+        const topCount = maxCount > 0 ? Math.min(config.API_PAGE_SIZE, maxCount) : config.API_PAGE_SIZE;
         const simplifiedParams = {
-          $top: Math.min(50, maxCount),
+          $top: topCount,
           $select: config.EMAIL_SELECT_FIELDS,
           $orderby: 'receivedDateTime desc'
         };
@@ -132,16 +144,18 @@ async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms
     try {
       console.error("Attempting search with only boolean filters");
       searchAttempts.push("boolean-filters-only");
-      
+
+      // Compute safe page size: use API_PAGE_SIZE when maxCount is 0 (unlimited)
+      const topCount = maxCount > 0 ? Math.min(config.API_PAGE_SIZE, maxCount) : config.API_PAGE_SIZE;
       const filterOnlyParams = {
-        $top: Math.min(50, maxCount),
+        $top: topCount,
         $select: config.EMAIL_SELECT_FIELDS,
         $orderby: 'receivedDateTime desc'
       };
-      
+
       // Add the boolean filters
       addBooleanFilters(filterOnlyParams, filterTerms);
-      
+
       const response = await callGraphAPIPaginated(accessToken, 'GET', endpoint, filterOnlyParams, maxCount);
       console.error(`Boolean filter search found ${response.value?.length || 0} results`);
       return response;
@@ -149,13 +163,15 @@ async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms
       console.error(`Boolean filter search failed: ${error.message}`);
     }
   }
-  
+
   // 4. Final fallback: just get recent emails with pagination
   console.error("All search strategies failed, falling back to recent emails");
   searchAttempts.push("recent-emails");
-  
+
+  // Compute safe page size: use API_PAGE_SIZE when maxCount is 0 (unlimited)
+  const topCount = maxCount > 0 ? Math.min(config.API_PAGE_SIZE, maxCount) : config.API_PAGE_SIZE;
   const basicParams = {
-    $top: Math.min(50, maxCount),
+    $top: topCount,
     $select: config.EMAIL_SELECT_FIELDS,
     $orderby: 'receivedDateTime desc'
   };
