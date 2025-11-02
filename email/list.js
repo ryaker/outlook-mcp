@@ -2,7 +2,7 @@
  * List emails functionality
  */
 const config = require('../config');
-const { callGraphAPI } = require('../utils/graph-api');
+const { callGraphAPI, callGraphAPIPaginated } = require('../utils/graph-api');
 const { ensureAuthenticated } = require('../auth');
 
 /**
@@ -12,7 +12,7 @@ const { ensureAuthenticated } = require('../auth');
  */
 async function handleListEmails(args) {
   const folder = args.folder || "inbox";
-  const count = Math.min(args.count || 10, config.MAX_RESULT_COUNT);
+  const requestedCount = args.count || 10;
   
   try {
     // Get access token
@@ -35,13 +35,13 @@ async function handleListEmails(args) {
     
     // Add query parameters
     const queryParams = {
-      $top: count,
+      $top: Math.min(50, requestedCount), // Use 50 per page for efficiency
       $orderby: 'receivedDateTime desc',
       $select: config.EMAIL_SELECT_FIELDS
     };
     
-    // Make API call
-    const response = await callGraphAPI(accessToken, 'GET', endpoint, null, queryParams);
+    // Make API call with pagination support
+    const response = await callGraphAPIPaginated(accessToken, 'GET', endpoint, queryParams, requestedCount);
     
     if (!response.value || response.value.length === 0) {
       return {

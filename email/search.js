@@ -2,7 +2,7 @@
  * Improved search emails functionality
  */
 const config = require('../config');
-const { callGraphAPI } = require('../utils/graph-api');
+const { callGraphAPI, callGraphAPIPaginated } = require('../utils/graph-api');
 const { ensureAuthenticated } = require('../auth');
 const { resolveFolderPath } = require('./folder-utils');
 
@@ -13,7 +13,7 @@ const { resolveFolderPath } = require('./folder-utils');
  */
 async function handleSearchEmails(args) {
   const folder = args.folder || "inbox";
-  const count = Math.min(args.count || 10, config.MAX_RESULT_COUNT);
+  const requestedCount = args.count || 10;
   const query = args.query || '';
   const from = args.from || '';
   const to = args.to || '';
@@ -29,13 +29,13 @@ async function handleSearchEmails(args) {
     const endpoint = await resolveFolderPath(accessToken, folder);
     console.error(`Using endpoint: ${endpoint} for folder: ${folder}`);
     
-    // Execute progressive search
+    // Execute progressive search with pagination
     const response = await progressiveSearch(
       endpoint, 
       accessToken, 
       { query, from, to, subject },
       { hasAttachments, unreadOnly },
-      count
+      requestedCount
     );
     
     return formatSearchResults(response);
@@ -66,20 +66,20 @@ async function handleSearchEmails(args) {
  * @param {string} accessToken - Access token
  * @param {object} searchTerms - Search terms (query, from, to, subject)
  * @param {object} filterTerms - Filter terms (hasAttachments, unreadOnly)
- * @param {number} count - Maximum number of results
+ * @param {number} maxCount - Maximum number of results to retrieve
  * @returns {Promise<object>} - Search results
  */
-async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms, count) {
+async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms, maxCount) {
   // Track search strategies attempted
   const searchAttempts = [];
   
   // 1. Try combined search (most specific)
   try {
-    const params = buildSearchParams(searchTerms, filterTerms, count);
+    const params = buildSearchParams(searchTerms, filterTerms, Math.min(50, maxCount));
     console.error("Attempting combined search with params:", params);
     searchAttempts.push("combined-search");
     
-    const response = await callGraphAPI(accessToken, 'GET', endpoint, null, params);
+    const response = await callGraphAPIPaginated(accessToken, 'GET', endpoint, params, maxCount);
     if (response.value && response.value.length > 0) {
       console.error(`Combined search successful: found ${response.value.length} results`);
       return response;
@@ -99,7 +99,7 @@ async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms
         
         // For single term search, only use $search with that term
         const simplifiedParams = {
-          $top: count,
+          $top: Math.min(50, maxCount),
           $select: config.EMAIL_SELECT_FIELDS,
           $orderby: 'receivedDateTime desc'
         };
@@ -116,7 +116,7 @@ async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms
         // Add boolean filters if applicable
         addBooleanFilters(simplifiedParams, filterTerms);
         
-        const response = await callGraphAPI(accessToken, 'GET', endpoint, null, simplifiedParams);
+        const response = await callGraphAPIPaginated(accessToken, 'GET', endpoint, simplifiedParams, maxCount);
         if (response.value && response.value.length > 0) {
           console.error(`Search with ${term} successful: found ${response.value.length} results`);
           return response;
@@ -134,7 +134,7 @@ async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms
       searchAttempts.push("boolean-filters-only");
       
       const filterOnlyParams = {
-        $top: count,
+        $top: Math.min(50, maxCount),
         $select: config.EMAIL_SELECT_FIELDS,
         $orderby: 'receivedDateTime desc'
       };
@@ -142,7 +142,7 @@ async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms
       // Add the boolean filters
       addBooleanFilters(filterOnlyParams, filterTerms);
       
-      const response = await callGraphAPI(accessToken, 'GET', endpoint, null, filterOnlyParams);
+      const response = await callGraphAPIPaginated(accessToken, 'GET', endpoint, filterOnlyParams, maxCount);
       console.error(`Boolean filter search found ${response.value?.length || 0} results`);
       return response;
     } catch (error) {
@@ -150,17 +150,17 @@ async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms
     }
   }
   
-  // 4. Final fallback: just get recent emails
+  // 4. Final fallback: just get recent emails with pagination
   console.error("All search strategies failed, falling back to recent emails");
   searchAttempts.push("recent-emails");
   
   const basicParams = {
-    $top: count,
+    $top: Math.min(50, maxCount),
     $select: config.EMAIL_SELECT_FIELDS,
     $orderby: 'receivedDateTime desc'
   };
   
-  const response = await callGraphAPI(accessToken, 'GET', endpoint, null, basicParams);
+  const response = await callGraphAPIPaginated(accessToken, 'GET', endpoint, basicParams, maxCount);
   console.error(`Fallback to recent emails found ${response.value?.length || 0} results`);
   
   // Add a note to the response about the search attempts
