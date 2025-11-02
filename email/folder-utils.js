@@ -10,34 +10,37 @@ const { callGraphAPI } = require('../utils/graph-api');
 const folderCache = {};
 
 /**
+ * Well-known folder names and their endpoints
+ */
+const WELL_KNOWN_FOLDERS = {
+  'inbox': 'me/mailFolders/inbox/messages',
+  'drafts': 'me/mailFolders/drafts/messages',
+  'sent': 'me/mailFolders/sentItems/messages',
+  'deleted': 'me/mailFolders/deletedItems/messages',
+  'junk': 'me/mailFolders/junkemail/messages',
+  'archive': 'me/mailFolders/archive/messages'
+};
+
+/**
  * Resolve a folder name to its endpoint path
  * @param {string} accessToken - Access token
  * @param {string} folderName - Folder name to resolve
  * @returns {Promise<string>} - Resolved endpoint path
  */
 async function resolveFolderPath(accessToken, folderName) {
+
   // Default to inbox if no folder specified
   if (!folderName) {
-    return 'me/messages';
+    return WELL_KNOWN_FOLDERS['inbox'];
   }
-  
-  // Handle well-known folder names
-  const wellKnownFolders = {
-    'inbox': 'me/messages',
-    'drafts': 'me/mailFolders/drafts/messages',
-    'sent': 'me/mailFolders/sentItems/messages',
-    'deleted': 'me/mailFolders/deletedItems/messages',
-    'junk': 'me/mailFolders/junkemail/messages',
-    'archive': 'me/mailFolders/archive/messages'
-  };
-  
+
   // Check if it's a well-known folder (case-insensitive)
   const lowerFolderName = folderName.toLowerCase();
-  if (wellKnownFolders[lowerFolderName]) {
+  if (WELL_KNOWN_FOLDERS[lowerFolderName]) {
     console.error(`Using well-known folder path for "${folderName}"`);
-    return wellKnownFolders[lowerFolderName];
+    return WELL_KNOWN_FOLDERS[lowerFolderName];
   }
-  
+
   try {
     // Try to find the folder by name
     const folderId = await getFolderIdByName(accessToken, folderName);
@@ -46,13 +49,13 @@ async function resolveFolderPath(accessToken, folderName) {
       console.error(`Resolved folder "${folderName}" to path: ${path}`);
       return path;
     }
-    
+
     // If not found, fall back to inbox
     console.error(`Couldn't find folder "${folderName}", falling back to inbox`);
-    return 'me/messages';
+    return WELL_KNOWN_FOLDERS['inbox'];
   } catch (error) {
     console.error(`Error resolving folder "${folderName}": ${error.message}`);
-    return 'me/messages';
+    return WELL_KNOWN_FOLDERS['inbox'];
   }
 }
 
@@ -165,6 +168,7 @@ async function getAllFolders(accessToken) {
 }
 
 module.exports = {
+  WELL_KNOWN_FOLDERS,
   resolveFolderPath,
   getFolderIdByName,
   getAllFolders

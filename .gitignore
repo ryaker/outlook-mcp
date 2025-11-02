@@ -24,6 +24,9 @@ yarn-error.log*
 *.swp
 *.swo
 
+# Claude Code local settings
+.claude/settings.local.json
+
 # OS specific files
 .DS_Store
 Thumbs.db
