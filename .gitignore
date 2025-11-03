@@ -34,3 +34,4 @@ Thumbs.db
 # Logs
 logs
 *.log
+.token_cache
