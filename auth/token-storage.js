@@ -10,7 +10,7 @@ class TokenStorage {
       clientId: process.env.MS_CLIENT_ID,
       clientSecret: process.env.MS_CLIENT_SECRET,
       redirectUri: process.env.MS_REDIRECT_URI || 'http://localhost:3333/auth/callback',
-      scopes: (process.env.MS_SCOPES || 'offline_access User.Read Mail.Read').split(' '),
+      scopes: (process.env.MS_SCOPES || 'offline_access User.Read Mail.Read Mail.ReadWrite Mail.Send Calendars.Read Calendars.ReadWrite Contacts.Read').split(' '),
       tokenEndpoint: process.env.MS_TOKEN_ENDPOINT || 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
       refreshTokenBuffer: 5 * 60 * 1000, // 5 minutes buffer for token refresh
       ...config // Allow overriding default config
@@ -68,6 +68,44 @@ class TokenStorage {
     return this._loadPromise;
   }
 
+  // Get all stored accounts (for multi-account support)
+  async getAllAccounts() {
+    const allTokens = await this.getTokens();
+    if (!allTokens) return [];
+
+    // Handle new format with accounts object
+    if (allTokens.accounts && typeof allTokens.accounts === 'object') {
+      return Object.keys(allTokens.accounts);
+    }
+
+    // Handle old format with single token (backward compatibility)
+    if (allTokens.access_token) {
+      return ['default'];
+    }
+
+    return [];
+  }
+
+  // Set active account for multi-account support
+  async setActiveAccount(email) {
+    const allTokens = await this.getTokens();
+    if (!allTokens || !allTokens.accounts || !allTokens.accounts[email]) {
+      throw new Error(`Account ${email} not found`);
+    }
+    if (!allTokens.accounts) allTokens.accounts = {};
+    allTokens.activeAccount = email;
+    this.tokens = allTokens;
+    await this._saveTokensToFile();
+    console.log(`Active account switched to: ${email}`);
+  }
+
+  // Get active account email
+  async getActiveAccount() {
+    const allTokens = await this.getTokens();
+    if (!allTokens) return null;
+    return allTokens.activeAccount || 'default';
+  }
+
   getExpiryTime() {
     return this.tokens && this.tokens.expires_at ? this.tokens.expires_at : 0;
   }
@@ -81,8 +119,48 @@ class TokenStorage {
   }
 
   async getValidAccessToken() {
-    await this.getTokens(); // Ensure tokens are loaded
+    const allTokens = await this.getTokens(); // Ensure tokens are loaded
 
+    if (!allTokens) {
+      console.log('No tokens available.');
+      return null;
+    }
+
+    // Handle new multi-account format
+    if (allTokens.accounts && typeof allTokens.accounts === 'object') {
+      const activeAccount = allTokens.activeAccount;
+      if (!activeAccount || !allTokens.accounts[activeAccount]) {
+        console.log(`No valid active account. Available accounts: ${Object.keys(allTokens.accounts).join(', ')}`);
+        return null;
+      }
+
+      const activeTokens = allTokens.accounts[activeAccount];
+      if (!activeTokens.access_token) {
+        console.log(`No access token for active account: ${activeAccount}`);
+        return null;
+      }
+
+      // Check expiration
+      const isExpired = Date.now() >= (activeTokens.expires_at - this.config.refreshTokenBuffer);
+      if (isExpired) {
+        console.log(`Access token for ${activeAccount} expired or nearing expiration. Attempting refresh.`);
+        if (activeTokens.refresh_token) {
+          try {
+            return await this.refreshAccessToken();
+          } catch (refreshError) {
+            console.error('Failed to refresh access token:', refreshError);
+            return null;
+          }
+        } else {
+          console.warn('No refresh token available for this account.');
+          return null;
+        }
+      }
+
+      return activeTokens.access_token;
+    }
+
+    // Handle old single-token format (backward compatibility)
     if (!this.tokens || !this.tokens.access_token) {
       console.log('No access token available.');
       return null;
@@ -219,7 +297,7 @@ class TokenStorage {
           try {
             const responseBody = JSON.parse(data);
             if (res.statusCode >= 200 && res.statusCode < 300) {
-              this.tokens = {
+              const newToken = {
                 access_token: responseBody.access_token,
                 refresh_token: responseBody.refresh_token,
                 expires_in: responseBody.expires_in,
@@ -227,15 +305,35 @@ class TokenStorage {
                 scope: responseBody.scope,
                 token_type: responseBody.token_type
               };
+
+              // Get user info to determine which account this is for
               try {
+                const userEmail = await this._getUserEmail(newToken.access_token);
+
+                // Load existing tokens and add this new account
+                let allTokens = await this.getTokens() || {};
+                if (!allTokens.accounts) allTokens.accounts = {};
+
+                allTokens.accounts[userEmail] = newToken;
+                allTokens.activeAccount = userEmail;
+
+                this.tokens = allTokens;
                 await this._saveTokensToFile();
-                console.log('Tokens exchanged and saved successfully.');
-                resolve(this.tokens);
-              } catch (saveError) {
-                console.error('Failed to save exchanged tokens:', saveError);
-                // Similar to refresh, tokens are in memory but not persisted.
-                // Rejecting to indicate the operation wasn't fully successful.
-                reject(new Error(`Tokens exchanged but failed to save: ${saveError.message}`));
+                console.log(`Tokens exchanged and saved successfully for account: ${userEmail}`);
+                resolve({...newToken, email: userEmail});
+              } catch (emailError) {
+                console.warn('Could not determine user email, using timestamp-based key', emailError);
+                // Fallback: use timestamp as key if we can't get email
+                const accountKey = `account_${Date.now()}`;
+                let allTokens = await this.getTokens() || {};
+                if (!allTokens.accounts) allTokens.accounts = {};
+
+                allTokens.accounts[accountKey] = newToken;
+                allTokens.activeAccount = accountKey;
+
+                this.tokens = allTokens;
+                await this._saveTokensToFile();
+                resolve({...newToken, email: accountKey});
               }
             } else {
               console.error('Error exchanging code for tokens:', responseBody);
@@ -252,6 +350,40 @@ class TokenStorage {
         reject(error);
       });
       req.write(postData);
+      req.end();
+    });
+  }
+
+  // Helper method to get user email from access token
+  async _getUserEmail(accessToken) {
+    return new Promise((resolve, reject) => {
+      const requestOptions = {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      };
+
+      const req = https.request('https://graph.microsoft.com/v1.0/me', requestOptions, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => {
+          try {
+            const userInfo = JSON.parse(data);
+            const email = userInfo.mail || userInfo.userPrincipalName;
+            if (email) {
+              resolve(email);
+            } else {
+              reject(new Error('No email found in user info'));
+            }
+          } catch (e) {
+            reject(new Error(`Failed to parse user info: ${e.message}`));
+          }
+        });
+      });
+
+      req.on('error', reject);
       req.end();
     });
   }

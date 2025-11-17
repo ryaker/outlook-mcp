@@ -17,10 +17,10 @@ module.exports = {
   
   // Authentication configuration
   AUTH_CONFIG: {
-    clientId: process.env.OUTLOOK_CLIENT_ID || '',
-    clientSecret: process.env.OUTLOOK_CLIENT_SECRET || '',
+    clientId: process.env.OUTLOOK_CLIENT_ID || process.env.MS_CLIENT_ID || '',
+    clientSecret: process.env.OUTLOOK_CLIENT_SECRET || process.env.MS_CLIENT_SECRET || '',
     redirectUri: 'http://localhost:3333/auth/callback',
-    scopes: ['Mail.Read', 'Mail.ReadWrite', 'Mail.Send', 'User.Read', 'Calendars.Read', 'Calendars.ReadWrite'],
+    scopes: (process.env.MS_SCOPES || 'offline_access User.Read Mail.Read Mail.ReadWrite Mail.Send Calendars.Read Calendars.ReadWrite Contacts.Read').split(' '),
     tokenStorePath: path.join(homeDir, '.outlook-mcp-tokens.json'),
     authServerUrl: 'http://localhost:3333'
   },
@@ -34,10 +34,7 @@ module.exports = {
   // Email constants
   EMAIL_SELECT_FIELDS: 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,bodyPreview,hasAttachments,importance,isRead',
   EMAIL_DETAIL_FIELDS: 'id,subject,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,bodyPreview,body,hasAttachments,importance,isRead,internetMessageHeaders',
-  
-  // Calendar constants
-  CALENDAR_SELECT_FIELDS: 'id,subject,bodyPreview,start,end,location,organizer,attendees,isAllDay,isCancelled',
-  
+
   // Pagination
   DEFAULT_PAGE_SIZE: 25,
   MAX_RESULT_COUNT: 50,

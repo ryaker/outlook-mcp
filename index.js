@@ -133,9 +133,29 @@ server.fallbackRequestHandler = async (request) => {
   }
 };
 
-// Make the script executable
-process.on('SIGTERM', () => {
-  console.error('SIGTERM received but staying alive');
+// Graceful shutdown handling
+let isShuttingDown = false;
+
+const gracefulShutdown = (signal) => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  console.error(`\n${signal} received, shutting down gracefully...`);
+  process.exit(0);
+};
+
+// Only exit on SIGINT (Ctrl+C), not SIGTERM (which inspector might send)
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
 // Start the server
@@ -144,5 +164,11 @@ server.connect(transport)
   .then(() => console.error(`${config.SERVER_NAME} connected and listening`))
   .catch(error => {
     console.error(`Connection error: ${error.message}`);
-    process.exit(1);
+    // Don't exit immediately on connection error - try to keep running
+    setTimeout(() => process.exit(1), 5000);
   });
+
+// Keep the process alive
+setInterval(() => {
+  // Periodic check to ensure we're still running
+}, 30000);

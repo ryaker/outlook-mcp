@@ -7,8 +7,8 @@
       ],
       "env": {
         "USE_TEST_MODE": "false",
-        "OUTLOOK_CLIENT_ID": "your-client-id-here",
-        "OUTLOOK_CLIENT_SECRET": "your-client-secret-here"
+        "OUTLOOK_CLIENT_ID": "YOUR_AZURE_CLIENT_ID_HERE",
+        "OUTLOOK_CLIENT_SECRET": "YOUR_AZURE_CLIENT_SECRET_HERE"
       }
     }
   }

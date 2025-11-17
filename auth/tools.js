@@ -2,7 +2,10 @@
  * Authentication-related tools for the Outlook MCP server
  */
 const config = require('../config');
-const tokenManager = require('./token-manager');
+const TokenStorage = require('./token-storage');
+
+// Initialize TokenStorage for multi-account support
+const tokenStorage = new TokenStorage(config.AUTH_CONFIG);
 
 /**
  * About tool handler
@@ -24,12 +27,16 @@ async function handleAbout() {
  */
 async function handleAuthenticate(args) {
   const force = args && args.force === true;
-  
+
   // For test mode, create a test token
   if (config.USE_TEST_MODE) {
     // Create a test token with a 1-hour expiry
-    tokenManager.createTestTokens();
-    
+    const testTokens = {
+      access_token: "test_access_token_" + Date.now(),
+      refresh_token: "test_refresh_token_" + Date.now(),
+      expires_at: Date.now() + (3600 * 1000)
+    };
+
     return {
       content: [{
         type: "text",
@@ -37,10 +44,28 @@ async function handleAuthenticate(args) {
       }]
     };
   }
-  
+
+  // Check if already authenticated (unless forcing re-auth)
+  if (!force) {
+    try {
+      const token = await tokenStorage.getValidAccessToken();
+      const activeAccount = await tokenStorage.getActiveAccount();
+      if (token) {
+        return {
+          content: [{
+            type: "text",
+            text: `✓ Already authenticated as: ${activeAccount}`
+          }]
+        };
+      }
+    } catch (error) {
+      console.error('[AUTHENTICATE] Error checking existing tokens:', error);
+    }
+  }
+
   // For real authentication, generate an auth URL and instruct the user to visit it
   const authUrl = `${config.AUTH_CONFIG.authServerUrl}/auth?client_id=${config.AUTH_CONFIG.clientId}`;
-  
+
   return {
     content: [{
       type: "text",
@@ -55,25 +80,35 @@ async function handleAuthenticate(args) {
  */
 async function handleCheckAuthStatus() {
   console.error('[CHECK-AUTH-STATUS] Starting authentication status check');
-  
-  const tokens = tokenManager.loadTokenCache();
-  
-  console.error(`[CHECK-AUTH-STATUS] Tokens loaded: ${tokens ? 'YES' : 'NO'}`);
-  
-  if (!tokens || !tokens.access_token) {
-    console.error('[CHECK-AUTH-STATUS] No valid access token found');
+
+  try {
+    const token = await tokenStorage.getValidAccessToken();
+    const activeAccount = await tokenStorage.getActiveAccount();
+    const accounts = await tokenStorage.getAllAccounts();
+
+    if (!token) {
+      console.error('[CHECK-AUTH-STATUS] No valid access token found');
+      return {
+        content: [{ type: "text", text: "Not authenticated" }]
+      };
+    }
+
+    console.error('[CHECK-AUTH-STATUS] Access token present');
+    console.error(`[CHECK-AUTH-STATUS] Active account: ${activeAccount}`);
+    console.error(`[CHECK-AUTH-STATUS] Available accounts: ${accounts.join(', ')}`);
+
     return {
-      content: [{ type: "text", text: "Not authenticated" }]
+      content: [{
+        type: "text",
+        text: `Authenticated and ready\n\nActive Account: ${activeAccount}\nAvailable Accounts: ${accounts.join(', ')}`
+      }]
+    };
+  } catch (error) {
+    console.error('[CHECK-AUTH-STATUS] Error:', error);
+    return {
+      content: [{ type: "text", text: `Error checking authentication: ${error.message}` }]
     };
   }
-  
-  console.error('[CHECK-AUTH-STATUS] Access token present');
-  console.error(`[CHECK-AUTH-STATUS] Token expires at: ${tokens.expires_at}`);
-  console.error(`[CHECK-AUTH-STATUS] Current time: ${Date.now()}`);
-  
-  return {
-    content: [{ type: "text", text: "Authenticated and ready" }]
-  };
 }
 
 // Tool definitions

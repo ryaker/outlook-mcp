@@ -9,25 +9,23 @@ const path = require('path');
 // Load environment variables from .env file
 require('dotenv').config();
 
+// Import the enhanced TokenStorage class for multi-account support
+const TokenStorage = require('./auth/token-storage');
+
 // Log to console
 console.log('Starting Outlook Authentication Server');
 
-// Authentication configuration
+// Authentication configuration - reads from environment variables
 const AUTH_CONFIG = {
-  clientId: process.env.MS_CLIENT_ID || '', // Set your client ID as an environment variable
-  clientSecret: process.env.MS_CLIENT_SECRET || '', // Set your client secret as an environment variable
+  clientId: process.env.MS_CLIENT_ID || process.env.OUTLOOK_CLIENT_ID || '', // Set your client ID as an environment variable
+  clientSecret: process.env.MS_CLIENT_SECRET || process.env.OUTLOOK_CLIENT_SECRET || '', // Set your client secret as an environment variable
   redirectUri: 'http://localhost:3333/auth/callback',
-  scopes: [
-    'offline_access',
-    'User.Read',
-    'Mail.Read',
-    'Mail.Send',
-    'Calendars.Read',
-    'Calendars.ReadWrite',
-    'Contacts.Read'
-  ],
+  scopes: (process.env.MS_SCOPES || 'offline_access User.Read Mail.Read Mail.ReadWrite Mail.Send Calendars.Read Calendars.ReadWrite Contacts.Read').split(' '),
   tokenStorePath: path.join(process.env.HOME || process.env.USERPROFILE, '.outlook-mcp-tokens.json')
 };
+
+// Initialize TokenStorage for multi-account support
+const tokenStorage = new TokenStorage(AUTH_CONFIG);
 
 // Create HTTP server
 const server = http.createServer((req, res) => {
@@ -225,66 +223,13 @@ const server = http.createServer((req, res) => {
   }
 });
 
-function exchangeCodeForTokens(code) {
-  return new Promise((resolve, reject) => {
-    const postData = querystring.stringify({
-      client_id: AUTH_CONFIG.clientId,
-      client_secret: AUTH_CONFIG.clientSecret,
-      code: code,
-      redirect_uri: AUTH_CONFIG.redirectUri,
-      grant_type: 'authorization_code',
-      scope: AUTH_CONFIG.scopes.join(' ')
-    });
-    
-    const options = {
-      hostname: 'login.microsoftonline.com',
-      path: '/common/oauth2/v2.0/token',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Content-Length': Buffer.byteLength(postData)
-      }
-    };
-    
-    const req = https.request(options, (res) => {
-      let data = '';
-      
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-      
-      res.on('end', () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          try {
-            const tokenResponse = JSON.parse(data);
-            
-            // Calculate expiration time (current time + expires_in seconds)
-            const expiresAt = Date.now() + (tokenResponse.expires_in * 1000);
-            
-            // Add expires_at for easier expiration checking
-            tokenResponse.expires_at = expiresAt;
-            
-            // Save tokens to file
-            fs.writeFileSync(AUTH_CONFIG.tokenStorePath, JSON.stringify(tokenResponse, null, 2), 'utf8');
-            console.log(`Tokens saved to ${AUTH_CONFIG.tokenStorePath}`);
-            
-            resolve(tokenResponse);
-          } catch (error) {
-            reject(new Error(`Error parsing token response: ${error.message}`));
-          }
-        } else {
-          reject(new Error(`Token exchange failed with status ${res.statusCode}: ${data}`));
-        }
-      });
-    });
-    
-    req.on('error', (error) => {
-      reject(error);
-    });
-    
-    req.write(postData);
-    req.end();
-  });
+async function exchangeCodeForTokens(code) {
+  try {
+    const tokens = await tokenStorage.exchangeCodeForTokens(code);
+    return tokens;
+  } catch (error) {
+    throw new Error(`Token exchange failed: ${error.message}`);
+  }
 }
 
 // Start server

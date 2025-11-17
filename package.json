@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "start:clean": "bash scripts/start-services.sh",
     "auth-server": "node outlook-auth-server.js",
+    "cleanup": "bash scripts/cleanup-ports.sh",
     "test-mode": "USE_TEST_MODE=true node index.js",
     "inspect": "npx @modelcontextprotocol/inspector node index.js",
     "test": "jest"
