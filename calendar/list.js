@@ -40,15 +40,51 @@ async function handleListEvents(args) {
       };
     }
     
+    // Detect system timezone
+    const systemTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
     // Format results
     const eventList = response.value.map((event, index) => {
-      const startDate = new Date(event.start.dateTime).toLocaleString(event.start.timeZone);
-      const endDate = new Date(event.end.dateTime).toLocaleString(event.end.timeZone);
+      const formatDateTime = (dateTimeData) => {
+        try {
+          const { dateTime, timeZone } = dateTimeData;
+          
+          // Parse the date. If timeZone is UTC, ensure JS treats it as UTC.
+          let date;
+          if (timeZone === 'UTC' || !timeZone) {
+            // Append Z if missing to force UTC parsing
+            date = new Date(dateTime.endsWith('Z') ? dateTime : dateTime + 'Z');
+          } else {
+            // If it's a specific timezone (though usually UTC without Prefer header)
+            // Note: JS doesn't easily parse non-UTC strings without a library like luxon
+            // but we'll try our best.
+            date = new Date(dateTime);
+          }
+
+          if (isNaN(date.getTime())) return dateTime;
+
+          // Format for display using the system timezone (user's local time)
+          return date.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+            timeZone: systemTimezone
+          });
+        } catch (e) {
+          return dateTimeData.dateTime;
+        }
+      };
+
+      const startDate = formatDateTime(event.start);
+      const endDate = formatDateTime(event.end);
       const location = event.location.displayName || 'No location';
       
       return `${index + 1}. ${event.subject} - Location: ${location}\nStart: ${startDate}\nEnd: ${endDate}\nSubject: ${event.subject}\nSummary: ${event.bodyPreview}\nID: ${event.id}\n`;
     }).join("\n");
-    
+
     return {
       content: [{ 
         type: "text", 
