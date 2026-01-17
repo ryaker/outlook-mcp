@@ -1,7 +1,7 @@
 {
-  "name": "outlook-mcp",
-  "version": "1.0.0",
-  "description": "MCP server for Claude to access Outlook data via Microsoft Graph API",
+  "name": "m365-mcp",
+  "version": "2.0.0",
+  "description": "MCP server for Claude to access Microsoft 365 (Outlook, OneDrive, Power Automate) via Microsoft Graph API",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -13,6 +13,9 @@
   "keywords": [
     "claude",
     "outlook",
+    "onedrive",
+    "power-automate",
+    "microsoft-365",
     "mcp",
     "microsoft-graph",
     "email"

@@ -186,7 +186,76 @@ async function callGraphAPIPaginated(accessToken, method, path, queryParams = {}
   }
 }
 
+/**
+ * Makes a request to the Microsoft Graph API that returns a download URL (302 redirect)
+ * Used for OneDrive file downloads which return a pre-authenticated download URL
+ * @param {string} accessToken - The access token for authentication
+ * @param {string} path - API endpoint path
+ * @returns {Promise<string>} - The download URL from the redirect
+ */
+async function callGraphAPIDownload(accessToken, path) {
+  // For test tokens, simulate download
+  if (config.USE_TEST_MODE && accessToken.startsWith('test_access_token_')) {
+    console.error(`TEST MODE: Simulating download for ${path}`);
+    return `https://example.com/download/${Date.now()}`;
+  }
+
+  return new Promise((resolve, reject) => {
+    const fullUrl = `${config.GRAPH_API_ENDPOINT}${path}`;
+    console.error(`Making download request: GET ${fullUrl}`);
+
+    const options = {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    };
+
+    const req = https.request(fullUrl, options, (res) => {
+      // Graph API returns 302 with Location header containing the download URL
+      if (res.statusCode === 302 && res.headers.location) {
+        resolve(res.headers.location);
+      } else if (res.statusCode >= 200 && res.statusCode < 300) {
+        // Some endpoints might return the URL in the body instead
+        let responseData = '';
+        res.on('data', (chunk) => {
+          responseData += chunk;
+        });
+        res.on('end', () => {
+          try {
+            const jsonResponse = JSON.parse(responseData);
+            if (jsonResponse['@microsoft.graph.downloadUrl']) {
+              resolve(jsonResponse['@microsoft.graph.downloadUrl']);
+            } else {
+              reject(new Error('No download URL found in response'));
+            }
+          } catch (error) {
+            reject(new Error(`Error parsing download response: ${error.message}`));
+          }
+        });
+      } else if (res.statusCode === 401) {
+        reject(new Error('UNAUTHORIZED'));
+      } else {
+        let responseData = '';
+        res.on('data', (chunk) => {
+          responseData += chunk;
+        });
+        res.on('end', () => {
+          reject(new Error(`Download request failed with status ${res.statusCode}: ${responseData}`));
+        });
+      }
+    });
+
+    req.on('error', (error) => {
+      reject(new Error(`Network error during download request: ${error.message}`));
+    });
+
+    req.end();
+  });
+}
+
 module.exports = {
   callGraphAPI,
-  callGraphAPIPaginated
+  callGraphAPIPaginated,
+  callGraphAPIDownload
 };
