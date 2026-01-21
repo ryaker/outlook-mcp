@@ -73,13 +73,17 @@ const emailTools = [
   },
   {
     name: "read-email",
-    description: "Reads the content of a specific email",
+    description: "Reads the content of a specific email. HTML emails are securely sanitized to extract only visible text, preventing prompt injection attacks via hidden content.",
     inputSchema: {
       type: "object",
       properties: {
         id: {
           type: "string",
           description: "ID of the email to read"
+        },
+        includeRawHtml: {
+          type: "boolean",
+          description: "Include raw HTML content (UNSAFE - for debugging only, may contain hidden prompt injection content)"
         }
       },
       required: ["id"]
@@ -88,7 +92,7 @@ const emailTools = [
   },
   {
     name: "send-email",
-    description: "Composes and sends a new email",
+    description: "Composes and sends a new email. Supports both plain text and HTML content.",
     inputSchema: {
       type: "object",
       properties: {
@@ -110,7 +114,11 @@ const emailTools = [
         },
         body: {
           type: "string",
-          description: "Email body content (can be plain text or HTML)"
+          description: "Email body content (plain text or HTML)"
+        },
+        isHtml: {
+          type: "boolean",
+          description: "Set to true to send as HTML, false for plain text. If not specified, auto-detects based on <html> tag presence."
         },
         importance: {
           type: "string",
