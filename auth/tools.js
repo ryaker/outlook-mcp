@@ -12,7 +12,7 @@ async function handleAbout() {
   return {
     content: [{
       type: "text",
-      text: `📧 MODULAR Outlook Assistant MCP Server v${config.SERVER_VERSION} 📧\n\nProvides access to Microsoft Outlook email, calendar, and contacts through Microsoft Graph API.\nImplemented with a modular architecture for improved maintainability.`
+      text: `M365 Assistant MCP Server v${config.SERVER_VERSION}\n\nProvides access to Microsoft 365 services through Microsoft Graph API:\n- Outlook (email, calendar, folders, rules)\n- OneDrive (files, folders, sharing)\n- Power Automate (flows, environments, runs)\n\nModular architecture for improved maintainability.`
     }]
   };
 }
@@ -80,7 +80,7 @@ async function handleCheckAuthStatus() {
 const authTools = [
   {
     name: "about",
-    description: "Returns information about this Outlook Assistant server",
+    description: "Returns information about this M365 Assistant server",
     inputSchema: {
       type: "object",
       properties: {},

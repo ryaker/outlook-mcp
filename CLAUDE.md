@@ -4,57 +4,75 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-- `npm install` - **ALWAYS run first** to install dependencies 
+- `npm install` - **ALWAYS run first** to install dependencies
 - `npm start` - Start the MCP server
 - `npm run auth-server` - Start the OAuth authentication server on port 3333 (**required for authentication**)
 - `npm run test-mode` - Start the server in test mode with mock data
 - `npm run inspect` - Use MCP Inspector to test the server interactively
 - `npm test` - Run Jest tests
-- `./test-modular-server.sh` - Test the server using MCP Inspector
-- `./test-direct.sh` - Direct testing script
 - `npx kill-port 3333` - Kill process using port 3333 if auth server won't start
 
 ## Architecture Overview
 
-This is a modular MCP (Model Context Protocol) server that provides Claude with access to Microsoft Outlook via the Microsoft Graph API. The architecture is organized into functional modules:
+This is a modular MCP (Model Context Protocol) server that provides Claude with access to Microsoft 365 services:
+- **Outlook** - Email, calendar, folders, rules
+- **OneDrive** - Files, folders, sharing
+- **Power Automate** - Flows, environments, runs
 
 ### Core Structure
 - `index.js` - Main entry point that combines all module tools and handles MCP protocol
-- `config.js` - Centralized configuration including API endpoints, field selections, and authentication settings
+- `config.js` - Centralized configuration (API endpoints, scopes, field selections)
 - `outlook-auth-server.js` - Standalone OAuth server for authentication flow
 
 ### Modules
 Each module exports tools and handlers:
-- `auth/` - OAuth 2.0 authentication with token management
+- `auth/` - OAuth 2.0 authentication with token management (Graph + Flow)
 - `calendar/` - Calendar operations (list, create, accept, decline, delete events)
 - `email/` - Email management (list, search, read, send, mark as read)
 - `folder/` - Folder operations (list, create, move)
 - `rules/` - Email rules management
+- `onedrive/` - OneDrive operations (list, search, download, upload, share, folder ops)
+- `power-automate/` - Flow operations (list environments, list/run/toggle flows, run history)
 - `utils/` - Shared utilities including Graph API client and OData helpers
 
 ### Key Components
-- **Token Management**: Tokens stored in `~/.outlook-mcp-tokens.json`
-- **Graph API Client**: `utils/graph-api.js` handles all Microsoft Graph API calls with proper OData encoding
+- **Token Management**: Tokens stored in `~/.outlook-mcp-tokens.json` (both Graph and Flow tokens)
+- **Graph API Client**: `utils/graph-api.js` handles Microsoft Graph API calls (Outlook, OneDrive)
+- **Flow API Client**: `power-automate/flow-api.js` handles Power Automate API calls
 - **Test Mode**: Mock data responses when `USE_TEST_MODE=true`
 - **Modular Tools**: Each module exports tools array that gets combined in main server
 
-## Authentication Flow
+## Authentication
 
-1. Azure app registration required with specific permissions (Mail.Read, Mail.Send, Calendars.ReadWrite, etc.)
-2. Start auth server: `npm run auth-server` 
+### Graph API (Outlook + OneDrive)
+1. Azure app registration required with permissions:
+   - `Mail.Read`, `Mail.ReadWrite`, `Mail.Send`
+   - `Calendars.Read`, `Calendars.ReadWrite`
+   - `Files.Read`, `Files.ReadWrite`
+   - `User.Read`, `offline_access`
+2. Start auth server: `npm run auth-server`
 3. Use authenticate tool to get OAuth URL
 4. Complete browser authentication
 5. Tokens automatically stored and refreshed
 
-## Configuration Requirements
+### Power Automate (Optional)
+- Requires separate Flow API scope: `https://service.flow.microsoft.com//.default`
+- Flow tokens stored alongside Graph tokens in same token file
+- Only solution-aware flows accessible via API
+- Only manual trigger flows can be triggered
+
+## Configuration
 
 ### Environment Variables
 - **For .env file**: Use `MS_CLIENT_ID` and `MS_CLIENT_SECRET`
 - **For Claude Desktop config**: Use `OUTLOOK_CLIENT_ID` and `OUTLOOK_CLIENT_SECRET`
 - **Important**: Always use the client secret VALUE from Azure, not the Secret ID
-- Copy `.env.example` to `.env` and populate with real Azure credentials
-- Default timezone is "Central European Standard Time"
-- Default page size is 25, max results 50
+
+### Config Constants
+- `GRAPH_API_ENDPOINT`: `https://graph.microsoft.com/v1.0/`
+- `FLOW_API_ENDPOINT`: `https://api.flow.microsoft.com`
+- `ONEDRIVE_UPLOAD_THRESHOLD`: 4MB (files larger need chunked upload)
+- Default page size: 25, max results: 50
 
 ### Common Setup Issues
 1. **Missing dependencies**: Always run `npm install` first
@@ -64,15 +82,14 @@ Each module exports tools and handlers:
 
 ## Test Mode
 
-Set `USE_TEST_MODE=true` to use mock data instead of real API calls. Mock responses are defined in `utils/mock-data.js`.
-
-## OData Query Handling
-
-The Graph API client properly handles OData filters with URI encoding. Filters are processed separately from other query parameters to ensure correct escaping of special characters.
+Set `USE_TEST_MODE=true` to use mock data instead of real API calls. Mock responses defined in:
+- `utils/mock-data.js` - Graph API mocks
+- `power-automate/flow-api.js` - Flow API mocks (inline)
 
 ## Error Handling
 
-- Authentication failures return "UNAUTHORIZED" error
-- Graph API errors include status codes and response details
+- Graph API auth failures: "UNAUTHORIZED" error
+- Flow API auth failures: "FLOW_UNAUTHORIZED" error
+- API errors include status codes and response details
 - Token expiration triggers re-authentication flow
-- Empty API responses are handled gracefully (returns '{}' if empty)
+- Empty API responses handled gracefully

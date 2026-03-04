@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * Outlook MCP Server - Main entry point
- * 
+ * M365 Assistant MCP Server - Main entry point
+ *
  * A Model Context Protocol server that provides access to
- * Microsoft Outlook through the Microsoft Graph API.
+ * Microsoft 365 services (Outlook, OneDrive, Power Automate)
+ * through the Microsoft Graph API and Flow API.
  */
 const { Server } = require("@modelcontextprotocol/sdk/server/index.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
@@ -15,6 +16,8 @@ const { calendarTools } = require('./calendar');
 const { emailTools } = require('./email');
 const { folderTools } = require('./folder');
 const { rulesTools } = require('./rules');
+const { onedriveTools } = require('./onedrive');
+const { powerAutomateTools } = require('./power-automate');
 
 // Log startup information
 console.error(`STARTING ${config.SERVER_NAME.toUpperCase()} MCP SERVER`);
@@ -26,8 +29,9 @@ const TOOLS = [
   ...calendarTools,
   ...emailTools,
   ...folderTools,
-  ...rulesTools
-  // Future modules: contactsTools, etc.
+  ...rulesTools,
+  ...onedriveTools,
+  ...powerAutomateTools
 ];
 
 // Create server with tools capabilities

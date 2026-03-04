@@ -9,8 +9,8 @@ const homeDir = process.env.HOME || process.env.USERPROFILE || os.homedir() || '
 
 module.exports = {
   // Server information
-  SERVER_NAME: "outlook-assistant",
-  SERVER_VERSION: "1.0.0",
+  SERVER_NAME: "m365-assistant",
+  SERVER_VERSION: "2.0.0",
   
   // Test mode setting
   USE_TEST_MODE: process.env.USE_TEST_MODE === 'true',
@@ -20,7 +20,7 @@ module.exports = {
     clientId: process.env.OUTLOOK_CLIENT_ID || '',
     clientSecret: process.env.OUTLOOK_CLIENT_SECRET || '',
     redirectUri: 'http://localhost:3333/auth/callback',
-    scopes: ['Mail.Read', 'Mail.ReadWrite', 'Mail.Send', 'User.Read', 'Calendars.Read', 'Calendars.ReadWrite'],
+    scopes: ['Mail.Read', 'Mail.ReadWrite', 'Mail.Send', 'User.Read', 'Calendars.Read', 'Calendars.ReadWrite', 'Files.Read', 'Files.ReadWrite'],
     tokenStorePath: path.join(homeDir, '.outlook-mcp-tokens.json'),
     authServerUrl: 'http://localhost:3333'
   },
@@ -44,4 +44,12 @@ module.exports = {
 
   // Timezone
   DEFAULT_TIMEZONE: "Central European Standard Time",
+
+  // OneDrive constants
+  ONEDRIVE_SELECT_FIELDS: 'id,name,size,lastModifiedDateTime,webUrl,folder,file,parentReference',
+  ONEDRIVE_UPLOAD_THRESHOLD: 4 * 1024 * 1024, // 4MB - files larger than this need chunked upload
+
+  // Power Automate / Flow constants
+  FLOW_API_ENDPOINT: 'https://api.flow.microsoft.com',
+  FLOW_SCOPE: 'https://service.flow.microsoft.com/.default',
 };
