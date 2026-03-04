@@ -40,15 +40,56 @@ async function handleListEvents(args) {
       };
     }
     
+    // Detect system timezone
+    const systemTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
     // Format results
     const eventList = response.value.map((event, index) => {
-      const startDate = new Date(event.start.dateTime).toLocaleString(event.start.timeZone);
-      const endDate = new Date(event.end.dateTime).toLocaleString(event.end.timeZone);
-      const location = event.location.displayName || 'No location';
+      const formatDateTime = (dateTimeData) => {
+        // Defensive checks: handle null/undefined and string inputs
+        if (!dateTimeData) return '';
+        const dateTime = typeof dateTimeData === 'string' ? dateTimeData : (dateTimeData.dateTime || '');
+        const timeZone = typeof dateTimeData === 'object' ? dateTimeData.timeZone : undefined;
+        if (!dateTime) return '';
+
+        // Detect if the string already contains timezone info (Z or +/-HH:MM)
+        const hasOffset = /[zZ]$|[+\-]\d{2}:\d{2}$/.test(dateTime);
+
+        // Helper to format a valid Date using the detected system timezone only if available
+        const formatDateObj = (date) => {
+          if (isNaN(date.getTime())) return dateTime;
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          const options = {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          };
+          if (tz) options.timeZone = tz;
+          return date.toLocaleString('en-US', options);
+        };
+
+        // If it's UTC or has explicit offset, parse safely
+        if (timeZone === 'UTC' || hasOffset || !timeZone) {
+          const iso = dateTime.endsWith('Z') || hasOffset ? dateTime : dateTime + 'Z';
+          const date = new Date(iso);
+          return formatDateObj(date);
+        }
+
+        // If there's a specific timezone but the string lacks an offset, we cannot reliably convert without a timezone-aware library.
+        // Return a clear fallback that includes the original timezone so we avoid silently showing an incorrect local time.
+        return `${dateTime} (${timeZone})`;
+      };
+
+      const startDate = formatDateTime(event.start);
+      const endDate = formatDateTime(event.end);
+      const location = event.location?.displayName || 'No location';
       
-      return `${index + 1}. ${event.subject} - Location: ${location}\nStart: ${startDate}\nEnd: ${endDate}\nSubject: ${event.subject}\nSummary: ${event.bodyPreview}\nID: ${event.id}\n`;
+      return `${index + 1}. ${event.subject} - Location: ${location}\nStart: ${startDate}\nEnd: ${endDate}\nSummary: ${event.bodyPreview}\nID: ${event.id}\n`;
     }).join("\n");
-    
+
     return {
       content: [{ 
         type: "text", 
