@@ -82,7 +82,7 @@ async function handleListEvents(args) {
       const endDate = formatDateTime(event.end);
       const location = event.location.displayName || 'No location';
       
-      return `${index + 1}. ${event.subject} - Location: ${location}\nStart: ${startDate}\nEnd: ${endDate}\nSubject: ${event.subject}\nSummary: ${event.bodyPreview}\nID: ${event.id}\n`;
+      return `${index + 1}. ${event.subject} - Location: ${location}\nStart: ${startDate}\nEnd: ${endDate}\nSummary: ${event.bodyPreview}\nID: ${event.id}\n`;
     }).join("\n");
 
     return {
