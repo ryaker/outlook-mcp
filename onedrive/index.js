@@ -51,7 +51,7 @@ const onedriveTools = [
   },
   {
     name: "onedrive-download",
-    description: "Get a download URL for a file in OneDrive",
+    description: "Get a download URL for a file in OneDrive. Either 'itemId' or 'path' must be provided.",
     inputSchema: {
       type: "object",
       properties: {
