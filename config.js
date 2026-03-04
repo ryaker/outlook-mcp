@@ -51,5 +51,5 @@ module.exports = {
 
   // Power Automate / Flow constants
   FLOW_API_ENDPOINT: 'https://api.flow.microsoft.com',
-  FLOW_SCOPE: 'https://service.flow.microsoft.com//.default',
+  FLOW_SCOPE: 'https://service.flow.microsoft.com/.default',
 };
