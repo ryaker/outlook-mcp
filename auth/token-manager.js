@@ -152,7 +152,7 @@ function saveFlowTokens(flowTokens) {
     };
 
     fs.writeFileSync(tokenPath, JSON.stringify(mergedTokens, null, 2));
-    console.error('Flow tokens saved successfully');
+    console.log('Flow tokens saved successfully');
 
     // Update cache
     cachedTokens = mergedTokens;
