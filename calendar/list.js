@@ -64,7 +64,7 @@ async function handleListEvents(args) {
           if (isNaN(date.getTime())) return dateTime;
 
           // Format for display using the system timezone (user's local time)
-          return date.toLocaleString('en-US', {
+          return date.toLocaleString(undefined, {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
