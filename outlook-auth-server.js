@@ -16,6 +16,8 @@ console.log('Starting Outlook Authentication Server');
 const AUTH_CONFIG = {
   clientId: process.env.MS_CLIENT_ID || '', // Set your client ID as an environment variable
   clientSecret: process.env.MS_CLIENT_SECRET || '', // Set your client secret as an environment variable
+  tenantId: process.env.MS_TENANT_ID || 'common',
+  authorityHost: (process.env.MS_AUTHORITY_HOST || 'https://login.microsoftonline.com').replace(/\/+$/, ''),
   redirectUri: 'http://localhost:3333/auth/callback',
   scopes: [
     'offline_access',
@@ -187,7 +189,7 @@ const server = http.createServer((req, res) => {
       state: Date.now().toString() // Simple state parameter for security
     };
     
-    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${querystring.stringify(authParams)}`;
+    const authUrl = `${AUTH_CONFIG.authorityHost}/${AUTH_CONFIG.tenantId}/oauth2/v2.0/authorize?${querystring.stringify(authParams)}`;
     console.log(`Redirecting to: ${authUrl}`);
     
     // Redirect to Microsoft's login page
@@ -237,8 +239,8 @@ function exchangeCodeForTokens(code) {
     });
     
     const options = {
-      hostname: 'login.microsoftonline.com',
-      path: '/common/oauth2/v2.0/token',
+      hostname: new URL(AUTH_CONFIG.authorityHost).hostname,
+      path: `/${AUTH_CONFIG.tenantId}/oauth2/v2.0/token`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

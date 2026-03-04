@@ -130,11 +130,13 @@ Edit `.env` and add your Azure credentials:
 # Get these values from Azure Portal > App Registrations > Your App
 MS_CLIENT_ID=your-application-client-id-here
 MS_CLIENT_SECRET=your-client-secret-VALUE-here
+MS_TENANT_ID=your-tenant-id-here
 USE_TEST_MODE=false
 ```
 
 **Important Notes:**
 - Use `MS_CLIENT_ID` and `MS_CLIENT_SECRET` in the `.env` file
+- Set `MS_TENANT_ID` for single-tenant apps to avoid `/common` endpoint errors
 - For Claude Desktop config, you'll use `OUTLOOK_CLIENT_ID` and `OUTLOOK_CLIENT_SECRET`
 - Always use the client secret **VALUE**, never the Secret ID
 
