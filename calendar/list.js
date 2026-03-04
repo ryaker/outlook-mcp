@@ -46,36 +46,41 @@ async function handleListEvents(args) {
     // Format results
     const eventList = response.value.map((event, index) => {
       const formatDateTime = (dateTimeData) => {
-        try {
-          const { dateTime, timeZone } = dateTimeData;
-          
-          // Parse the date. If timeZone is UTC, ensure JS treats it as UTC.
-          let date;
-          if (timeZone === 'UTC' || !timeZone) {
-            // Append Z if missing to force UTC parsing
-            date = new Date(dateTime.endsWith('Z') ? dateTime : dateTime + 'Z');
-          } else {
-            // If it's a specific timezone (though usually UTC without Prefer header)
-            // Note: JS doesn't easily parse non-UTC strings without a library like luxon
-            // but we'll try our best.
-            date = new Date(dateTime);
-          }
+        // Defensive checks: handle null/undefined and string inputs
+        if (!dateTimeData) return '';
+        const dateTime = typeof dateTimeData === 'string' ? dateTimeData : (dateTimeData.dateTime || '');
+        const timeZone = typeof dateTimeData === 'object' ? dateTimeData.timeZone : undefined;
+        if (!dateTime) return '';
 
+        // Detect if the string already contains timezone info (Z or +/-HH:MM)
+        const hasOffset = /[zZ]$|[+\-]\d{2}:\d{2}$/.test(dateTime);
+
+        // Helper to format a valid Date using the detected system timezone only if available
+        const formatDateObj = (date) => {
           if (isNaN(date.getTime())) return dateTime;
-
-          // Format for display using the system timezone (user's local time)
-          return date.toLocaleString(undefined, {
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          const options = {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
             hour: 'numeric',
             minute: '2-digit',
-            hour12: true,
-            timeZone: systemTimezone
-          });
-        } catch (e) {
-          return dateTimeData.dateTime;
+            hour12: true
+          };
+          if (tz) options.timeZone = tz;
+          return date.toLocaleString('en-US', options);
+        };
+
+        // If it's UTC or has explicit offset, parse safely
+        if (timeZone === 'UTC' || hasOffset || !timeZone) {
+          const iso = dateTime.endsWith('Z') || hasOffset ? dateTime : dateTime + 'Z';
+          const date = new Date(iso);
+          return formatDateObj(date);
         }
+
+        // If there's a specific timezone but the string lacks an offset, we cannot reliably convert without a timezone-aware library.
+        // Return a clear fallback that includes the original timezone so we avoid silently showing an incorrect local time.
+        return `${dateTime} (${timeZone})`;
       };
 
       const startDate = formatDateTime(event.start);
