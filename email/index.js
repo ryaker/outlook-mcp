@@ -5,6 +5,7 @@ const handleListEmails = require('./list');
 const handleSearchEmails = require('./search');
 const handleReadEmail = require('./read');
 const handleSendEmail = require('./send');
+const handleDraftEmail = require('./draft');
 const handleMarkAsRead = require('./mark-as-read');
 
 // Email tool definitions
@@ -127,6 +128,42 @@ const emailTools = [
     handler: handleSendEmail
   },
   {
+    name: "draft-email",
+    description: "Creates and saves an email draft in Outlook",
+    inputSchema: {
+      type: "object",
+      properties: {
+        to: {
+          type: "string",
+          description: "Comma-separated list of recipient email addresses"
+        },
+        cc: {
+          type: "string",
+          description: "Comma-separated list of CC recipient email addresses"
+        },
+        bcc: {
+          type: "string",
+          description: "Comma-separated list of BCC recipient email addresses"
+        },
+        subject: {
+          type: "string",
+          description: "Draft email subject"
+        },
+        body: {
+          type: "string",
+          description: "Draft email body content (can be plain text or HTML)"
+        },
+        importance: {
+          type: "string",
+          description: "Email importance (normal, high, low)",
+          enum: ["normal", "high", "low"]
+        }
+      },
+      required: []
+    },
+    handler: handleDraftEmail
+  },
+  {
     name: "mark-as-read",
     description: "Marks an email as read or unread",
     inputSchema: {
@@ -153,5 +190,6 @@ module.exports = {
   handleSearchEmails,
   handleReadEmail,
   handleSendEmail,
+  handleDraftEmail,
   handleMarkAsRead
 };
