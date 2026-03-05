@@ -6,11 +6,11 @@ const http = require('http');
 // For now, let's assume sse-server.js creates and exports an Express app instance directly or via a function.
 
 // Mock dependencies from sse-server.js
-jest.mock('../../auth/token-storage');
-jest.mock('../../auth/oauth-server'); // If sse-server uses setupOAuthRoutes
+jest.mock('../auth/token-storage');
+jest.mock('../auth/oauth-server'); // If sse-server uses setupOAuthRoutes
 
-const TokenStorage = require('../../auth/token-storage');
-const { setupOAuthRoutes, createAuthConfig } = require('../../auth/oauth-server');
+const TokenStorage = require('../auth/token-storage');
+const { setupOAuthRoutes, createAuthConfig } = require('../auth/oauth-server');
 
 // Global mock for TokenStorage instance
 const mockTokenStorageInstance = {
@@ -59,7 +59,7 @@ const startServer = (done) => {
         // In a real scenario, you'd get this from sse-server.js
         if (!sseApp) { // Create a dummy app if not loaded (which it won't be)
              console.warn("sse-server.test.js: Using a DUMMY app for SSE tests. sse-server.js needs to be refactored for proper testing.");
-             const {app: tempApp} = require('../../sse-server'); // try to load it
+             const {app: tempApp} = require('../sse-server'); // try to load it
              sseApp = tempApp;
         }
 
