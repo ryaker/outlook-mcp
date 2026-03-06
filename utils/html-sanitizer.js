@@ -186,11 +186,14 @@ function sanitizeHtmlToText(html) {
   // 4d: font-size:0 or font-size:1px (with or without units)
   result = removeHiddenElements(result, 'font-size\\s*:\\s*[01](?:px|em|rem|pt|%)?(?![0-9])');
 
-  // 4e: white-on-white text (color:white with background:white in same style)
-  result = removeHiddenElements(result, 'color\\s*:\\s*white[^"\']*background[^"\']*:\\s*white');
-  result = removeHiddenElements(result, 'background[^"\']*:\\s*white[^"\']*color\\s*:\\s*white');
+  // 4e: zero-height with overflow:hidden (commonly used to hide text)
+  result = removeHiddenElements(result, 'height\\s*:\\s*0(?:px|em|rem|pt|%)?[^\"\\']*overflow\\s*:\\s*hidden');
 
-  // 4f: Also remove self-closing tags with hiding styles (like hidden images with alt text)
+  // 4f: white-on-white text (color:white with background:white in same style)
+  result = removeHiddenElements(result, 'color\\s*:\\s*white[^\"\\']*background[^\"\\']*:\\s*white');
+  result = removeHiddenElements(result, 'background[^\"\\']*:\\s*white[^\"\\']*color\\s*:\\s*white');
+
+  // 4g: Also remove self-closing tags with hiding styles (like hidden images with alt text)
   result = result.replace(/<[^>]+style\s*=\s*["'][^"']*(?:display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0\b)[^"']*["'][^>]*\/?>/gi, '');
 
   // Step 5: Remove elements with hidden attribute
