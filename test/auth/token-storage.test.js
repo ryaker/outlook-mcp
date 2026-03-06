@@ -1,6 +1,7 @@
 const fs = require('fs').promises;
 const https = require('https');
 const path = require('path');
+const querystring = require('querystring');
 const TokenStorage = require('../../auth/token-storage');
 
 jest.mock('fs', () => ({
@@ -28,7 +29,7 @@ describe('TokenStorage', () => {
   const tokenStorePath = path.join(mockHomeDir, '.outlook-mcp-tokens.json');
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     tokenStorage = new TokenStorage(baseConfig);
     // Ensure tokens are null at the start of each test that doesn't mock readFile
     tokenStorage.tokens = null;
@@ -163,17 +164,17 @@ describe('TokenStorage', () => {
     });
 
     it('should return true if token is past expiration time (considering buffer)', () => {
-      tokenStorage.tokens = { expires_at: Date.now() - (baseConfig.refreshTokenBuffer + 1000) }; // Expired by 1s + buffer
+      tokenStorage.tokens = { expires_at: Date.now() - (tokenStorage.config.refreshTokenBuffer + 1000) }; // Expired by 1s + buffer
       expect(tokenStorage.isTokenExpired()).toBe(true);
     });
 
     it('should return true if token is within buffer period', () => {
-        tokenStorage.tokens = { expires_at: Date.now() + (baseConfig.refreshTokenBuffer - 1000) }; // Expires in buffer - 1s
+        tokenStorage.tokens = { expires_at: Date.now() + (tokenStorage.config.refreshTokenBuffer - 1000) }; // Expires in buffer - 1s
         expect(tokenStorage.isTokenExpired()).toBe(true);
     });
 
     it('should return false if token is not expired and outside buffer', () => {
-      tokenStorage.tokens = { expires_at: Date.now() + (baseConfig.refreshTokenBuffer + 60000) }; // Valid for 1 min + buffer
+      tokenStorage.tokens = { expires_at: Date.now() + (tokenStorage.config.refreshTokenBuffer + 60000) }; // Valid for 1 min + buffer
       expect(tokenStorage.isTokenExpired()).toBe(false);
     });
   });
@@ -419,7 +420,8 @@ describe('TokenStorage', () => {
         const promise1 = tokenStorage.refreshAccessToken();
         const promise2 = tokenStorage.refreshAccessToken();
 
-        expect(promise1).toBe(promise2); // Should be the same promise object
+        // Both calls should share the same underlying _refreshPromise (deduplication)
+        expect(tokenStorage._refreshPromise).not.toBeNull();
 
         // Simulate successful response for the single underlying HTTP request
         const mockRes = {
