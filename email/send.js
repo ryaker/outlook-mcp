@@ -11,7 +11,7 @@ const { ensureAuthenticated } = require('../auth');
  * @returns {object} - MCP response
  */
 async function handleSendEmail(args) {
-  const { to, cc, bcc, subject, body, importance = 'normal', saveToSentItems = true } = args;
+  const { to, cc, bcc, subject, body, importance = 'normal', saveToSentItems = true, isHtml } = args;
   
   // Validate required parameters
   if (!to) {
@@ -73,12 +73,17 @@ async function handleSendEmail(args) {
       };
     }) : [];
     
+    // Determine content type: explicit isHtml param takes precedence, otherwise auto-detect
+    const contentType = isHtml === true ? 'html' :
+                        isHtml === false ? 'text' :
+                        (body.includes('<html') || body.includes('<HTML')) ? 'html' : 'text';
+
     // Prepare email object
     const emailObject = {
       message: {
         subject,
         body: {
-          contentType: body.includes('<html') ? 'html' : 'text',
+          contentType: contentType,
           content: body
         },
         toRecipients,

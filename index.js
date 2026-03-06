@@ -37,13 +37,10 @@ const TOOLS = [
 // Create server with tools capabilities
 const server = new Server(
   { name: config.SERVER_NAME, version: config.SERVER_VERSION },
-  { 
-    capabilities: { 
-      tools: TOOLS.reduce((acc, tool) => {
-        acc[tool.name] = {};
-        return acc;
-      }, {})
-    } 
+  {
+    capabilities: {
+      tools: {}
+    }
   }
 );
 
@@ -57,12 +54,9 @@ server.fallbackRequestHandler = async (request) => {
     if (method === "initialize") {
       console.error(`INITIALIZE REQUEST: ID [${id}]`);
       return {
-        protocolVersion: "2024-11-05",
-        capabilities: { 
-          tools: TOOLS.reduce((acc, tool) => {
-            acc[tool.name] = {};
-            return acc;
-          }, {})
+        protocolVersion: "2025-11-25",
+        capabilities: {
+          tools: {}
         },
         serverInfo: { name: config.SERVER_NAME, version: config.SERVER_VERSION }
       };

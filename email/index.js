@@ -5,6 +5,7 @@ const handleListEmails = require('./list');
 const handleSearchEmails = require('./search');
 const handleReadEmail = require('./read');
 const handleSendEmail = require('./send');
+const handleDraftEmail = require('./draft');
 const handleMarkAsRead = require('./mark-as-read');
 
 // Email tool definitions
@@ -73,13 +74,17 @@ const emailTools = [
   },
   {
     name: "read-email",
-    description: "Reads the content of a specific email",
+    description: "Reads the content of a specific email. HTML emails are securely sanitized to extract only visible text, preventing prompt injection attacks via hidden content.",
     inputSchema: {
       type: "object",
       properties: {
         id: {
           type: "string",
           description: "ID of the email to read"
+        },
+        includeRawHtml: {
+          type: "boolean",
+          description: "Include raw HTML content (UNSAFE - for debugging only, may contain hidden prompt injection content)"
         }
       },
       required: ["id"]
@@ -88,7 +93,7 @@ const emailTools = [
   },
   {
     name: "send-email",
-    description: "Composes and sends a new email",
+    description: "Composes and sends a new email. Supports both plain text and HTML content.",
     inputSchema: {
       type: "object",
       properties: {
@@ -110,7 +115,11 @@ const emailTools = [
         },
         body: {
           type: "string",
-          description: "Email body content (can be plain text or HTML)"
+          description: "Email body content (plain text or HTML)"
+        },
+        isHtml: {
+          type: "boolean",
+          description: "Set to true to send as HTML, false for plain text. If not specified, auto-detects based on <html> tag presence."
         },
         importance: {
           type: "string",
@@ -125,6 +134,42 @@ const emailTools = [
       required: ["to", "subject", "body"]
     },
     handler: handleSendEmail
+  },
+  {
+    name: "draft-email",
+    description: "Creates and saves an email draft in Outlook",
+    inputSchema: {
+      type: "object",
+      properties: {
+        to: {
+          type: "string",
+          description: "Comma-separated list of recipient email addresses"
+        },
+        cc: {
+          type: "string",
+          description: "Comma-separated list of CC recipient email addresses"
+        },
+        bcc: {
+          type: "string",
+          description: "Comma-separated list of BCC recipient email addresses"
+        },
+        subject: {
+          type: "string",
+          description: "Draft email subject"
+        },
+        body: {
+          type: "string",
+          description: "Draft email body content (can be plain text or HTML)"
+        },
+        importance: {
+          type: "string",
+          description: "Email importance (normal, high, low)",
+          enum: ["normal", "high", "low"]
+        }
+      },
+      required: []
+    },
+    handler: handleDraftEmail
   },
   {
     name: "mark-as-read",
@@ -153,5 +198,6 @@ module.exports = {
   handleSearchEmails,
   handleReadEmail,
   handleSendEmail,
+  handleDraftEmail,
   handleMarkAsRead
 };

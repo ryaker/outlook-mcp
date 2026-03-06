@@ -98,23 +98,28 @@ async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms
         searchAttempts.push(`single-term-${term}`);
         
         // For single term search, only use $search with that term
+        // Graph API does not support $orderby or $filter with $search
         const simplifiedParams = {
           $top: Math.min(50, maxCount),
-          $select: config.EMAIL_SELECT_FIELDS,
-          $orderby: 'receivedDateTime desc'
+          $select: config.EMAIL_SELECT_FIELDS
         };
+        
+        // Build KQL terms for search
+        const kqlParts = [];
         
         // Add the search term in the appropriate KQL syntax
         if (term === 'query') {
           // General query doesn't need a prefix
-          simplifiedParams.$search = `"${searchTerms[term]}"`;
+          kqlParts.push(searchTerms[term]);
         } else {
           // Specific field searches use field:value syntax
-          simplifiedParams.$search = `${term}:"${searchTerms[term]}"`;
+          kqlParts.push(`${term}:${searchTerms[term]}`);
         }
         
-        // Add boolean filters if applicable
-        addBooleanFilters(simplifiedParams, filterTerms);
+        // Add boolean filters as KQL (can't use $filter with $search)
+        addBooleanFiltersAsKQL(kqlParts, filterTerms);
+        
+        simplifiedParams.$search = `"${kqlParts.join(' ')}"`;
         
         const response = await callGraphAPIPaginated(accessToken, 'GET', endpoint, simplifiedParams, maxCount);
         if (response.value && response.value.length > 0) {
@@ -184,8 +189,7 @@ async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms
 function buildSearchParams(searchTerms, filterTerms, count) {
   const params = {
     $top: count,
-    $select: config.EMAIL_SELECT_FIELDS,
-    $orderby: 'receivedDateTime desc'
+    $select: config.EMAIL_SELECT_FIELDS
   };
   
   // Handle search terms
@@ -210,17 +214,22 @@ function buildSearchParams(searchTerms, filterTerms, count) {
   
   // Add $search if we have any search terms
   if (kqlTerms.length > 0) {
-    params.$search = kqlTerms.join(' ');
+    // Graph API does not support $orderby or $filter with $search
+    // Move boolean filters into KQL syntax instead
+    addBooleanFiltersAsKQL(kqlTerms, filterTerms);
+    params.$search = `"${kqlTerms.join(' ')}"`;
+  } else {
+    // No search terms — safe to use $orderby and $filter
+    params.$orderby = 'receivedDateTime desc';
+    addBooleanFilters(params, filterTerms);
   }
-  
-  // Add boolean filters
-  addBooleanFilters(params, filterTerms);
   
   return params;
 }
 
 /**
- * Add boolean filters to query parameters
+ * Add boolean filters to query parameters as OData $filter
+ * Only use when $search is NOT present (they conflict in Graph API)
  * @param {object} params - Query parameters
  * @param {object} filterTerms - Filter terms (hasAttachments, unreadOnly)
  */
@@ -238,6 +247,22 @@ function addBooleanFilters(params, filterTerms) {
   // Add $filter parameter if we have any filter conditions
   if (filterConditions.length > 0) {
     params.$filter = filterConditions.join(' and ');
+  }
+}
+
+/**
+ * Add boolean filters as KQL terms for use with $search
+ * Use this instead of addBooleanFilters when $search is present
+ * @param {string[]} kqlTerms - Array of KQL terms to append to
+ * @param {object} filterTerms - Filter terms (hasAttachments, unreadOnly)
+ */
+function addBooleanFiltersAsKQL(kqlTerms, filterTerms) {
+  if (filterTerms.hasAttachments === true) {
+    kqlTerms.push('hasAttachments:true');
+  }
+  
+  if (filterTerms.unreadOnly === true) {
+    kqlTerms.push('isRead:false');
   }
 }
 

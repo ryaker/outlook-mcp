@@ -223,6 +223,16 @@ describe('OAuth Server Routes', () => {
         const config = createAuthConfig(); // No prefix, defaults to MS_
         expect(config.clientId).toBe('ms_client_id_val');
     });
+
+    it('should build tenant-specific endpoints when TENANT_ID is set', () => {
+        delete process.env.MYAPP_AUTHORITY_HOST;
+        delete process.env.MYAPP_TOKEN_ENDPOINT;
+        delete process.env.MYAPP_AUTH_ENDPOINT;
+        process.env.MYAPP_TENANT_ID = 'd508624f-a0b7-4fd3-9511-05b18ca02784';
+        const config = createAuthConfig('MYAPP_');
+        expect(config.tokenEndpoint).toBe('https://login.microsoftonline.com/d508624f-a0b7-4fd3-9511-05b18ca02784/oauth2/v2.0/token');
+        expect(config.authEndpoint).toBe('https://login.microsoftonline.com/d508624f-a0b7-4fd3-9511-05b18ca02784/oauth2/v2.0/authorize');
+    });
   });
 });
 // Adding a newline at the end of the file
