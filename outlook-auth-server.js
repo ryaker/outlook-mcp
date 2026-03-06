@@ -239,7 +239,7 @@ function exchangeCodeForTokens(code) {
     });
     
     const options = {
-      hostname: new URL(AUTH_CONFIG.authorityHost).hostname,
+      hostname: AUTH_CONFIG.authorityHost.replace(/^https?:\/\//, '').split('/')[0],
       path: `/${AUTH_CONFIG.tenantId}/oauth2/v2.0/token`,
       method: 'POST',
       headers: {
