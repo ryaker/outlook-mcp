@@ -51,7 +51,7 @@ class TokenStorage {
       return false;
     }
     try {
-      await fs.writeFile(this.config.tokenStorePath, JSON.stringify(this.tokens, null, 2));
+      await fs.writeFile(this.config.tokenStorePath, JSON.stringify(this.tokens, null, 2), { mode: 0o600 });
       console.log('Tokens saved successfully.');
       // return true; // No longer returning boolean, will throw on error.
     } catch (error) {

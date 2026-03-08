@@ -87,7 +87,7 @@ describe('TokenStorage', () => {
     it('should write tokens to file', async () => {
       tokenStorage.tokens = { access_token: 'save_token' };
       await tokenStorage._saveTokensToFile();
-      expect(fs.writeFile).toHaveBeenCalledWith(tokenStorePath, JSON.stringify(tokenStorage.tokens, null, 2));
+      expect(fs.writeFile).toHaveBeenCalledWith(tokenStorePath, JSON.stringify(tokenStorage.tokens, null, 2), { mode: 0o600 });
     });
 
     it('should log warning if no tokens to save', async () => {

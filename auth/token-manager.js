@@ -55,7 +55,7 @@ function loadTokenCache() {
 function saveTokenCache(tokens) {
   try {
     const tokenPath = config.AUTH_CONFIG.tokenStorePath;
-    fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2));
+    fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2), { mode: 0o600 });
     console.error('Tokens saved successfully');
     
     // Update the cache
@@ -122,7 +122,7 @@ function saveFlowTokens(flowTokens) {
       flow_expires_at: flowTokens.expires_at || (Date.now() + (flowTokens.expires_in || 3600) * 1000)
     };
 
-    fs.writeFileSync(tokenPath, JSON.stringify(mergedTokens, null, 2));
+    fs.writeFileSync(tokenPath, JSON.stringify(mergedTokens, null, 2), { mode: 0o600 });
     console.log('Flow tokens saved successfully');
 
     // Update cache

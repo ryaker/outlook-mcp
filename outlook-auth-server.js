@@ -298,7 +298,7 @@ function exchangeCodeForTokens(code) {
             tokenResponse.expires_at = expiresAt;
             
             // Save tokens to file
-            fs.writeFileSync(AUTH_CONFIG.tokenStorePath, JSON.stringify(tokenResponse, null, 2), 'utf8');
+            fs.writeFileSync(AUTH_CONFIG.tokenStorePath, JSON.stringify(tokenResponse, null, 2), { mode: 0o600 });
             console.log(`Tokens saved to ${AUTH_CONFIG.tokenStorePath}`);
             
             resolve(tokenResponse);
