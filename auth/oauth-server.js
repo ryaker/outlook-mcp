@@ -64,23 +64,14 @@ function setupOAuthRoutes(app, tokenStorage, authConfig, envPrefix = 'MS_') {
 
   if (!(tokenStorage instanceof TokenStorage)) {
     console.error("Error: tokenStorage is not an instance of TokenStorage. OAuth routes will not function correctly.");
-    // Optionally, you could throw an error here or disable the routes
-    // throw new Error("Invalid tokenStorage provided to setupOAuthRoutes");
   }
-
 
   app.get('/auth', (req, res) => {
     if (!authConfig.clientId) {
       return res.status(500).send(templates.authError('Configuration Error', 'Client ID is not configured.'));
     }
-    const state = crypto.randomBytes(16).toString('hex'); // Generate a random 16-byte string
-    // Store state in session or similar mechanism if available.
-    // For a server without sessions, this state would need to be passed through and verified differently,
-    // or a temporary server-side storage (like a short-lived cache) would be needed.
-    // For this example, we'll assume session middleware is configured elsewhere if this were a full app.
-    // If using express-session: req.session.oauthState = state;
-    // Since this is a module, actual session handling is outside its direct scope,
-    // but it's crucial for the consuming application to handle state verification.
+    // Generate CSRF state -- consuming application must store and validate this value
+    const state = crypto.randomBytes(16).toString('hex');
 
     const authorizationUrl = `${authConfig.authEndpoint}?` +
       querystring.stringify({
@@ -97,40 +88,13 @@ function setupOAuthRoutes(app, tokenStorage, authConfig, envPrefix = 'MS_') {
   app.get('/auth/callback', async (req, res) => {
     const { code, error, error_description, state } = req.query;
 
-    // IMPORTANT: State validation is crucial for CSRF protection.
-    // The application using this module MUST implement a way to store the 'state' generated in /auth
-    // (e.g., in a user session if using express-session, or a short-lived cache)
-    // and then verify it here against the 'state' received from the OAuth provider.
-    // For example, if using express-session:
-    // const savedState = req.session.oauthState;
-    // if (!state || state !== savedState) {
-    //   console.error("OAuth callback state mismatch. Potential CSRF attack.");
-    //   return res.status(400).send(templates.authError('Invalid State', 'CSRF token mismatch. Please try authenticating again.'));
-    // }
-    // delete req.session.oauthState; // Clean up session state
-
-    // Since this module itself doesn't manage sessions, we'll log a warning if state is missing,
-    // but actual enforcement must be done by the consuming application.
-    // The Gemini review recommended uncommenting the rejection.
-    // However, the consuming app (CLI or server) is responsible for session/state storage.
-    // This module *cannot* validate state if it wasn't involved in storing it.
-    // The PR author (ranxian) needs to implement state storage & validation in the calling server (sse-server.js or outlook-auth-server.js).
-    // For now, enforcing a missing state here would break flows where state *is* passed but not validated by *this specific module*.
-    // The best this module can do is check for presence and rely on the consumer to validate the actual value.
-    // The original PR #10's outlook-auth-server.js used Date.now() and didn't store/validate it beyond this.
-    // The new sse-server.js also doesn't show session management for state.
-    // So, we will make the check for presence mandatory as per Gemini's suggestion.
+    // Reject requests missing the state parameter to prevent CSRF attacks.
+    // Full state value validation is the responsibility of the consuming application,
+    // since this module does not manage sessions.
     if (!state) {
-        console.error("OAuth callback received without a 'state' parameter. Rejecting request to prevent potential CSRF attack.");
-        return res.status(400).send(templates.authError('Missing State Parameter', 'The state parameter was missing from the OAuth callback. This is a security risk. Please try authenticating again.'));
+      console.error("OAuth callback received without a 'state' parameter.");
+      return res.status(400).send(templates.authError('Missing State Parameter', 'The state parameter was missing from the OAuth callback. Please try authenticating again.'));
     }
-    // Further validation of the state's VALUE (e.g., req.session.oauthState === state) is the responsibility
-    // of the application integrating this module, as session management is outside this module's scope.
-    // if (req.session && req.session.oauthState !== state) {
-    //    return res.status(400).send(templates.authError('Invalid State Parameter', 'CSRF detected. State mismatch.'));
-    // }
-    // if (req.session) delete req.session.oauthState;
-
 
     if (error) {
       return res.status(400).send(templates.authError(error, error_description));
@@ -167,7 +131,4 @@ function setupOAuthRoutes(app, tokenStorage, authConfig, envPrefix = 'MS_') {
 module.exports = {
   setupOAuthRoutes,
   createAuthConfig,
-  // Exporting templates for potential direct use or testing, though not typical
-  // templates
 };
-// Adding a newline at the end of the file as requested by Gemini Code Assist

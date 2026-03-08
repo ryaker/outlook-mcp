@@ -53,7 +53,6 @@ class TokenStorage {
     try {
       await fs.writeFile(this.config.tokenStorePath, JSON.stringify(this.tokens, null, 2), { mode: 0o600 });
       console.log('Tokens saved successfully.');
-      // return true; // No longer returning boolean, will throw on error.
     } catch (error) {
       console.error('Error saving token cache:', error);
       throw error; // Propagate the error
@@ -277,4 +276,3 @@ class TokenStorage {
 }
 
 module.exports = TokenStorage;
-// Adding a newline at the end of the file as requested by Gemini Code Assist
