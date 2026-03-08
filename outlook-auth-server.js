@@ -33,6 +33,9 @@ const AUTH_CONFIG = {
   tokenStorePath: path.join(process.env.HOME || process.env.USERPROFILE, '.outlook-mcp-tokens.json')
 };
 
+// Store pending OAuth state for CSRF validation
+let pendingOAuthState = null;
+
 // Create HTTP server
 const server = http.createServer((req, res) => {
   const parsedUrl = url.parse(req.url, true);
@@ -42,7 +45,34 @@ const server = http.createServer((req, res) => {
   
   if (pathname === '/auth/callback') {
     const query = parsedUrl.query;
-    
+
+    // Validate OAuth state parameter to prevent CSRF attacks
+    if (!query.state || query.state !== pendingOAuthState) {
+      console.error('OAuth state mismatch - potential CSRF attack');
+      res.writeHead(400, { 'Content-Type': 'text/html' });
+      res.end(`
+        <html>
+          <head>
+            <title>Security Error</title>
+            <style>
+              body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+              h1 { color: #d9534f; }
+              .error-box { background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 4px; }
+            </style>
+          </head>
+          <body>
+            <h1>Security Error</h1>
+            <div class="error-box">
+              <p>OAuth state parameter mismatch. This may indicate a CSRF attack.</p>
+            </div>
+            <p>Please close this window and try authenticating again.</p>
+          </body>
+        </html>
+      `);
+      return;
+    }
+    pendingOAuthState = null; // Clear after use (single-use)
+
     if (query.error) {
       console.error(`Authentication error: ${query.error} - ${query.error_description}`);
       res.writeHead(400, { 'Content-Type': 'text/html' });
@@ -177,18 +207,17 @@ const server = http.createServer((req, res) => {
       return;
     }
     
-    // Get client_id from query parameters or use the default
-    const query = parsedUrl.query;
-    const clientId = query.client_id || AUTH_CONFIG.clientId;
-    
+    // Generate cryptographically secure state for CSRF protection
+    pendingOAuthState = crypto.randomBytes(16).toString('hex');
+
     // Build the authorization URL
     const authParams = {
-      client_id: clientId,
+      client_id: AUTH_CONFIG.clientId,
       response_type: 'code',
       redirect_uri: AUTH_CONFIG.redirectUri,
       scope: AUTH_CONFIG.scopes.join(' '),
       response_mode: 'query',
-      state: Date.now().toString() // Simple state parameter for security
+      state: pendingOAuthState
     };
     
     const authUrl = `${AUTH_CONFIG.authorityHost}/${AUTH_CONFIG.tenantId}/oauth2/v2.0/authorize?${querystring.stringify(authParams)}`;
