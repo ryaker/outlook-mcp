@@ -2,18 +2,9 @@ const express = require('express');
 const querystring = require('querystring');
 const https = require('https');
 const fs = require('fs');
-const crypto = require('crypto'); // Added for generating random string
-const TokenStorage = require('./token-storage'); // Assuming TokenStorage is in the same directory
-
-// HTML templates
-function escapeHtml(unsafe) {
-  return unsafe
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
+const crypto = require('crypto');
+const TokenStorage = require('./token-storage');
+const { escapeHtml } = require('../utils/html-sanitizer');
 
 const templates = {
   authError: (error, errorDescription) => `

@@ -260,6 +260,20 @@ function sanitizeHtmlToText(html) {
 }
 
 /**
+ * Escape special HTML characters to prevent XSS
+ * @param {string} unsafe - Untrusted string to escape
+ * @returns {string} - HTML-safe string
+ */
+function escapeHtml(unsafe) {
+  return String(unsafe)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/**
  * Decode common HTML entities
  * @param {string} text - Text with HTML entities
  * @returns {string} - Decoded text
@@ -370,6 +384,7 @@ module.exports = {
   removeInvisibleChars,
   hasHidingCSS,
   hasHidingAttributes,
+  escapeHtml,
   // Export for testing
   INVISIBLE_CHARS_REGEX,
   HIDING_CSS_PATTERNS,
