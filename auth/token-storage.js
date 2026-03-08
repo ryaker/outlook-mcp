@@ -246,8 +246,8 @@ class TokenStorage {
               reject(new Error(responseBody.error_description || `Token exchange failed with status ${res.statusCode}`));
             }
           } catch (e) { // Catch any error during parsing or saving
-            console.error('Error processing token exchange response or saving tokens:', e, "Raw data:", data);
-            reject(new Error(`Error processing token response: ${e.message}. Response data: ${data}`));
+            console.error('Error processing token exchange response:', e.message);
+            reject(new Error(`Error processing token response: ${e.message}`));
           }
         });
       });
