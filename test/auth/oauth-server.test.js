@@ -124,7 +124,7 @@ describe('OAuth Server Routes', () => {
       expect(response.text).toContain('Error:</strong> Missing State Parameter');
       expect(response.text).toContain('The state parameter was missing from the OAuth callback.');
       expect(mockTokenStorageInstance.exchangeCodeForTokens).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith("OAuth callback received without a 'state' parameter. Rejecting request to prevent potential CSRF attack.");
+      expect(consoleErrorSpy).toHaveBeenCalledWith("OAuth callback received without a 'state' parameter.");
       consoleErrorSpy.mockRestore();
     });
 
