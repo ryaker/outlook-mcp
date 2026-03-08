@@ -5,6 +5,8 @@ const querystring = require('querystring');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const { escapeHtml } = require('./utils/html-sanitizer');
 
 // Load environment variables from .env file
 require('dotenv').config();
@@ -57,8 +59,8 @@ const server = http.createServer((req, res) => {
           <body>
             <h1>Authentication Error</h1>
             <div class="error-box">
-              <p><strong>Error:</strong> ${query.error}</p>
-              <p><strong>Description:</strong> ${query.error_description || 'No description provided'}</p>
+              <p><strong>Error:</strong> ${escapeHtml(query.error)}</p>
+              <p><strong>Description:</strong> ${escapeHtml(query.error_description || 'No description provided')}</p>
             </div>
             <p>Please close this window and try again.</p>
           </body>
@@ -112,7 +114,7 @@ const server = http.createServer((req, res) => {
               <body>
                 <h1>Token Exchange Error</h1>
                 <div class="error-box">
-                  <p>${error.message}</p>
+                  <p>${escapeHtml(error.message)}</p>
                 </div>
                 <p>Please close this window and try again.</p>
               </body>
