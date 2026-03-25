@@ -1,5 +1,5 @@
-#!/usr/bin/env node
 const http = require('http');
+require("dotenv").config();
 const url = require('url');
 const querystring = require('querystring');
 const https = require('https');
@@ -12,6 +12,10 @@ require('dotenv').config();
 // Log to console
 console.log('Starting Outlook Authentication Server');
 
+// Mail.ReadWrite is required for mailbox mutations (send, drafts, mark read, etc.).
+const DEFAULT_GRAPH_SCOPES =
+  'offline_access User.Read Mail.Read Mail.ReadWrite Mail.Send Calendars.Read Calendars.ReadWrite Contacts.Read';
+
 // Authentication configuration
 const AUTH_CONFIG = {
   clientId: process.env.MS_CLIENT_ID || '', // Set your client ID as an environment variable
@@ -19,15 +23,7 @@ const AUTH_CONFIG = {
   tenantId: process.env.MS_TENANT_ID || 'common',
   authorityHost: (process.env.MS_AUTHORITY_HOST || 'https://login.microsoftonline.com').replace(/\/+$/, ''),
   redirectUri: 'http://localhost:3333/auth/callback',
-  scopes: [
-    'offline_access',
-    'User.Read',
-    'Mail.Read',
-    'Mail.Send',
-    'Calendars.Read',
-    'Calendars.ReadWrite',
-    'Contacts.Read'
-  ],
+  scopes: (process.env.MS_SCOPES || DEFAULT_GRAPH_SCOPES).split(/\s+/).filter(Boolean),
   tokenStorePath: path.join(process.env.HOME || process.env.USERPROFILE, '.outlook-mcp-tokens.json')
 };
 

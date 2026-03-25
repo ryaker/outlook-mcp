@@ -24,7 +24,7 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
-    "dotenv": "^16.5.0"
+    "dotenv": "^16.6.1"
   },
   "devDependencies": {
     "@modelcontextprotocol/inspector": "^0.10.2",

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require("dotenv").config();
 /**
  * M365 Assistant MCP Server - Main entry point
  *
