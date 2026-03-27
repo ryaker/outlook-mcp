@@ -13,6 +13,7 @@ const folderCache = {};
  * Well-known folder names and their endpoints
  */
 const WELL_KNOWN_FOLDERS = {
+  'all': 'me/messages',
   'inbox': 'me/mailFolders/inbox/messages',
   'drafts': 'me/mailFolders/drafts/messages',
   'sent': 'me/mailFolders/sentItems/messages',
