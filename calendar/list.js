@@ -17,17 +17,22 @@ async function handleListEvents(args) {
     // Get access token
     const accessToken = await ensureAuthenticated();
     
-    // Build API endpoint
-    let endpoint = 'me/events';
-    
-    // Add query parameters
+    // Use calendarView endpoint to include expanded recurring event instances
+    const now = new Date();
+    const endDate = new Date(now);
+    endDate.setDate(endDate.getDate() + 30); // Look 30 days ahead by default
+
+    let endpoint = 'me/calendarView';
+
+    // calendarView requires startDateTime and endDateTime as query params
     const queryParams = {
+      startDateTime: now.toISOString(),
+      endDateTime: endDate.toISOString(),
       $top: count,
       $orderby: 'start/dateTime',
-      $filter: `start/dateTime ge '${new Date().toISOString()}'`,
       $select: config.CALENDAR_SELECT_FIELDS
     };
-    
+
     // Make API call
     const response = await callGraphAPI(accessToken, 'GET', endpoint, null, queryParams);
     

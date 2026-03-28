@@ -201,15 +201,15 @@ function buildSearchParams(searchTerms, filterTerms, count) {
   }
   
   if (searchTerms.subject) {
-    kqlTerms.push(`subject:"${searchTerms.subject}"`);
+    kqlTerms.push(`subject:${searchTerms.subject}`);
   }
-  
+
   if (searchTerms.from) {
-    kqlTerms.push(`from:"${searchTerms.from}"`);
+    kqlTerms.push(`from:${searchTerms.from}`);
   }
-  
+
   if (searchTerms.to) {
-    kqlTerms.push(`to:"${searchTerms.to}"`);
+    kqlTerms.push(`to:${searchTerms.to}`);
   }
   
   // Add $search if we have any search terms

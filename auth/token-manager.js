@@ -14,62 +14,36 @@ let cachedTokens = null;
 function loadTokenCache() {
   try {
     const tokenPath = config.AUTH_CONFIG.tokenStorePath;
-    console.error(`[DEBUG] Attempting to load tokens from: ${tokenPath}`);
-    console.error(`[DEBUG] HOME directory: ${process.env.HOME}`);
-    console.error(`[DEBUG] Full resolved path: ${tokenPath}`);
-    
-    // Log file existence and details
+
     if (!fs.existsSync(tokenPath)) {
-      console.error('[DEBUG] Token file does not exist');
       return null;
     }
-    
-    const stats = fs.statSync(tokenPath);
-    console.error(`[DEBUG] Token file stats:
-      Size: ${stats.size} bytes
-      Created: ${stats.birthtime}
-      Modified: ${stats.mtime}`);
-    
+
     const tokenData = fs.readFileSync(tokenPath, 'utf8');
-    console.error('[DEBUG] Token file contents length:', tokenData.length);
-    console.error('[DEBUG] Token file first 200 characters:', tokenData.slice(0, 200));
-    
+
     try {
       const tokens = JSON.parse(tokenData);
-      console.error('[DEBUG] Parsed tokens keys:', Object.keys(tokens));
-      
-      // Log each key's value to see what's present
-      Object.keys(tokens).forEach(key => {
-        console.error(`[DEBUG] ${key}: ${typeof tokens[key]}`);
-      });
-      
-      // Check for access token presence
+
       if (!tokens.access_token) {
-        console.error('[DEBUG] No access_token found in tokens');
         return null;
       }
-      
+
       // Check token expiration
       const now = Date.now();
       const expiresAt = tokens.expires_at || 0;
-      
-      console.error(`[DEBUG] Current time: ${now}`);
-      console.error(`[DEBUG] Token expires at: ${expiresAt}`);
-      
+
       if (now > expiresAt) {
-        console.error('[DEBUG] Token has expired');
         return null;
       }
-      
-      // Update the cache
+
       cachedTokens = tokens;
       return tokens;
     } catch (parseError) {
-      console.error('[DEBUG] Error parsing token JSON:', parseError);
+      console.error('Error parsing token file:', parseError.message);
       return null;
     }
   } catch (error) {
-    console.error('[DEBUG] Error loading token cache:', error);
+    console.error('Error loading token cache:', error.message);
     return null;
   }
 }
@@ -82,16 +56,13 @@ function loadTokenCache() {
 function saveTokenCache(tokens) {
   try {
     const tokenPath = config.AUTH_CONFIG.tokenStorePath;
-    console.error(`Saving tokens to: ${tokenPath}`);
-    
-    fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2));
-    console.error('Tokens saved successfully');
-    
-    // Update the cache
+
+    fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2), { mode: 0o600 });
+
     cachedTokens = tokens;
     return true;
   } catch (error) {
-    console.error('Error saving token cache:', error);
+    console.error('Error saving token cache:', error.message);
     return false;
   }
 }
