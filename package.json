@@ -3,6 +3,10 @@
   "version": "2.0.0",
   "description": "MCP server for Claude to access Microsoft 365 (Outlook, OneDrive, Power Automate) via Microsoft Graph API",
   "main": "index.js",
+  "bin": {
+    "m365-mcp": "./index.js",
+    "m365-mcp-auth": "./outlook-auth-server.js"
+  },
   "scripts": {
     "start": "node index.js",
     "auth-server": "node outlook-auth-server.js",
