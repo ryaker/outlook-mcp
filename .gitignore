@@ -32,7 +32,7 @@ yarn-error.log*
 Thumbs.db
 
 # Accidentally committed config folder
-~
+~/
 
 # Logs
 logs

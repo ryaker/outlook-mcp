@@ -122,7 +122,7 @@ function saveFlowTokens(flowTokens) {
       flow_expires_at: flowTokens.expires_at || (Date.now() + (flowTokens.expires_in || 3600) * 1000)
     };
 
-    fs.writeFileSync(tokenPath, JSON.stringify(mergedTokens, null, 2));
+    fs.writeFileSync(tokenPath, JSON.stringify(mergedTokens, null, 2), { mode: 0o600 });
     console.log('Flow tokens saved successfully');
 
     // Update cache

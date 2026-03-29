@@ -26,6 +26,15 @@ function escapeHtml(str) {
 
 // CSRF state store (state -> timestamp, cleaned up periodically)
 const pendingStates = new Map();
+const TEN_MINUTES = 10 * 60 * 1000;
+
+// Periodically clean up expired CSRF states to prevent memory leaks
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamp] of pendingStates.entries()) {
+    if (now - timestamp > TEN_MINUTES) pendingStates.delete(key);
+  }
+}, 5 * 60 * 1000).unref(); // unref so the timer doesn't prevent process exit
 
 // Authentication configuration
 const AUTH_CONFIG = {
@@ -206,12 +215,6 @@ const server = http.createServer((req, res) => {
     // Generate cryptographically secure state parameter for CSRF protection
     const state = crypto.randomBytes(32).toString('hex');
     pendingStates.set(state, Date.now());
-
-    // Clean up expired states (older than 10 minutes)
-    const TEN_MINUTES = 10 * 60 * 1000;
-    for (const [key, timestamp] of pendingStates) {
-      if (Date.now() - timestamp > TEN_MINUTES) pendingStates.delete(key);
-    }
 
     // Build the authorization URL
     const authParams = {

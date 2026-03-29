@@ -18,15 +18,25 @@ async function handleListEvents(args) {
     const accessToken = await ensureAuthenticated();
     
     // Use calendarView endpoint to include expanded recurring event instances
-    const now = new Date();
-    const endDate = new Date(now);
-    endDate.setDate(endDate.getDate() + 30); // Look 30 days ahead by default
+    const startDate = args.startDateTime ? new Date(args.startDateTime) : new Date();
+    const endDate = args.endDateTime
+      ? new Date(args.endDateTime)
+      : new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000); // default 30 days
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || endDate <= startDate) {
+      return {
+        content: [{
+          type: "text",
+          text: "Invalid date range. Provide valid startDateTime/endDateTime with endDateTime > startDateTime."
+        }]
+      };
+    }
 
     let endpoint = 'me/calendarView';
 
     // calendarView requires startDateTime and endDateTime as query params
     const queryParams = {
-      startDateTime: now.toISOString(),
+      startDateTime: startDate.toISOString(),
       endDateTime: endDate.toISOString(),
       $top: count,
       $orderby: 'start/dateTime',
