@@ -18,6 +18,14 @@ const calendarTools = [
         count: {
           type: "number",
           description: "Number of events to retrieve (default: 10, max: 50)"
+        },
+        startDateTime: {
+          type: "string",
+          description: "ISO 8601 start date/time for the query range (default: now)"
+        },
+        endDateTime: {
+          type: "string",
+          description: "ISO 8601 end date/time for the query range (default: startDateTime + 30 days)"
         }
       },
       required: []

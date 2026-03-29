@@ -3,6 +3,7 @@ const http = require('http');
 const url = require('url');
 const querystring = require('querystring');
 const https = require('https');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -11,6 +12,29 @@ require('dotenv').config();
 
 // Log to console
 console.log('Starting Outlook Authentication Server');
+
+// HTML escaping to prevent reflected XSS
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// CSRF state store (state -> timestamp, cleaned up periodically)
+const pendingStates = new Map();
+const TEN_MINUTES = 10 * 60 * 1000;
+
+// Periodically clean up expired CSRF states to prevent memory leaks
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamp] of pendingStates.entries()) {
+    if (now - timestamp > TEN_MINUTES) pendingStates.delete(key);
+  }
+}, 5 * 60 * 1000).unref(); // unref so the timer doesn't prevent process exit
 
 // Authentication configuration
 const AUTH_CONFIG = {
@@ -40,9 +64,22 @@ const server = http.createServer((req, res) => {
   
   if (pathname === '/auth/callback') {
     const query = parsedUrl.query;
-    
+
+    // Validate CSRF state parameter
+    if (!query.state || !pendingStates.has(query.state)) {
+      console.error('Invalid or missing OAuth state parameter');
+      res.writeHead(403, { 'Content-Type': 'text/html' });
+      res.end(`
+        <html><head><title>Invalid State</title></head>
+        <body><h1>Authentication Error</h1>
+        <p>Invalid or expired OAuth state parameter. Please try authenticating again.</p></body></html>
+      `);
+      return;
+    }
+    pendingStates.delete(query.state);
+
     if (query.error) {
-      console.error(`Authentication error: ${query.error} - ${query.error_description}`);
+      console.error(`Authentication error: ${query.error}`);
       res.writeHead(400, { 'Content-Type': 'text/html' });
       res.end(`
         <html>
@@ -57,8 +94,8 @@ const server = http.createServer((req, res) => {
           <body>
             <h1>Authentication Error</h1>
             <div class="error-box">
-              <p><strong>Error:</strong> ${query.error}</p>
-              <p><strong>Description:</strong> ${query.error_description || 'No description provided'}</p>
+              <p><strong>Error:</strong> ${escapeHtml(query.error)}</p>
+              <p><strong>Description:</strong> ${escapeHtml(query.error_description || 'No description provided')}</p>
             </div>
             <p>Please close this window and try again.</p>
           </body>
@@ -66,10 +103,10 @@ const server = http.createServer((req, res) => {
       `);
       return;
     }
-    
+
     if (query.code) {
       console.log('Authorization code received, exchanging for tokens...');
-      
+
       // Exchange code for tokens
       exchangeCodeForTokens(query.code)
         .then((tokens) => {
@@ -112,7 +149,7 @@ const server = http.createServer((req, res) => {
               <body>
                 <h1>Token Exchange Error</h1>
                 <div class="error-box">
-                  <p>${error.message}</p>
+                  <p>${escapeHtml(error.message)}</p>
                 </div>
                 <p>Please close this window and try again.</p>
               </body>
@@ -175,18 +212,18 @@ const server = http.createServer((req, res) => {
       return;
     }
     
-    // Get client_id from query parameters or use the default
-    const query = parsedUrl.query;
-    const clientId = query.client_id || AUTH_CONFIG.clientId;
-    
+    // Generate cryptographically secure state parameter for CSRF protection
+    const state = crypto.randomBytes(32).toString('hex');
+    pendingStates.set(state, Date.now());
+
     // Build the authorization URL
     const authParams = {
-      client_id: clientId,
+      client_id: AUTH_CONFIG.clientId,
       response_type: 'code',
       redirect_uri: AUTH_CONFIG.redirectUri,
       scope: AUTH_CONFIG.scopes.join(' '),
       response_mode: 'query',
-      state: Date.now().toString() // Simple state parameter for security
+      state
     };
     
     const authUrl = `${AUTH_CONFIG.authorityHost}/${AUTH_CONFIG.tenantId}/oauth2/v2.0/authorize?${querystring.stringify(authParams)}`;
@@ -266,8 +303,8 @@ function exchangeCodeForTokens(code) {
             // Add expires_at for easier expiration checking
             tokenResponse.expires_at = expiresAt;
             
-            // Save tokens to file
-            fs.writeFileSync(AUTH_CONFIG.tokenStorePath, JSON.stringify(tokenResponse, null, 2), 'utf8');
+            // Save tokens to file with restrictive permissions
+            fs.writeFileSync(AUTH_CONFIG.tokenStorePath, JSON.stringify(tokenResponse, null, 2), { encoding: 'utf8', mode: 0o600 });
             console.log(`Tokens saved to ${AUTH_CONFIG.tokenStorePath}`);
             
             resolve(tokenResponse);
