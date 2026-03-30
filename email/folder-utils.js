@@ -144,7 +144,7 @@ async function getAllFolders(accessToken) {
     return await fetchFoldersRecursive(accessToken, 'me/mailFolders', selectFields);
   } catch (error) {
     console.error(`Error getting all folders: ${error.message}`);
-    return [];
+    throw error;
   }
 }
 
@@ -156,19 +156,41 @@ async function getAllFolders(accessToken) {
  * @returns {Promise<Array>} - Flat array of all folder objects
  */
 async function fetchFoldersRecursive(accessToken, endpoint, selectFields) {
-  const response = await callGraphAPI(
-    accessToken,
-    'GET',
-    endpoint,
-    null,
-    { $top: 100, $select: selectFields }
-  );
+  // Paginate through all results rather than capping at 100
+  let folders = [];
+  let nextEndpoint = endpoint;
+  let nextParams = { $top: 100, $select: selectFields };
 
-  if (!response.value || response.value.length === 0) {
+  while (nextEndpoint) {
+    const response = await callGraphAPI(
+      accessToken,
+      'GET',
+      nextEndpoint,
+      null,
+      nextParams
+    );
+
+    if (!response.value || response.value.length === 0) {
+      break;
+    }
+
+    folders = folders.concat(response.value);
+
+    // Graph API returns a full URL in @odata.nextLink; extract the relative path
+    if (response['@odata.nextLink']) {
+      const nextUrl = new URL(response['@odata.nextLink']);
+      // Use the path after "/v1.0/" as the next endpoint, params are embedded in nextLink
+      nextEndpoint = nextUrl.pathname.replace(/^\/v1\.0\//, '');
+      nextParams = Object.fromEntries(nextUrl.searchParams.entries());
+    } else {
+      nextEndpoint = null;
+    }
+  }
+
+  if (folders.length === 0) {
     return [];
   }
 
-  const folders = response.value;
   const withChildren = folders.filter(f => f.childFolderCount > 0);
 
   const childResults = await Promise.all(withChildren.map(async (folder) => {
@@ -180,7 +202,7 @@ async function fetchFoldersRecursive(accessToken, endpoint, selectFields) {
       );
     } catch (error) {
       console.error(`Error getting child folders for "${folder.displayName}": ${error.message}`);
-      return [];
+      throw error;
     }
   }));
 
