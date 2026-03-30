@@ -9,7 +9,7 @@ const { ensureAuthenticated } = require('../auth');
  * @param {object} args - Tool arguments
  * @returns {object} - MCP response
  */
-async function handleDeleteEmail(args) {
+async function handleDeleteEmail(args = {}) {
   const emailId = args.id;
   const permanent = args.permanent === true;
 
@@ -23,8 +23,8 @@ async function handleDeleteEmail(args) {
     const accessToken = await ensureAuthenticated();
 
     if (permanent) {
-      // Hard delete - permanently remove the message
-      await callGraphAPI(accessToken, 'DELETE', `me/messages/${encodeURIComponent(emailId)}`);
+      // Hard delete - permanently remove the message via permanentDelete endpoint
+      await callGraphAPI(accessToken, 'POST', `me/messages/${encodeURIComponent(emailId)}/permanentDelete`);
       return {
         content: [{ type: "text", text: "Email permanently deleted." }]
       };
@@ -38,7 +38,7 @@ async function handleDeleteEmail(args) {
       };
     }
   } catch (error) {
-    if (error.message === 'Authentication required') {
+    if (error.message === 'Authentication required' || error.message === 'UNAUTHORIZED') {
       return {
         content: [{ type: "text", text: "Authentication required. Please use the 'authenticate' tool first." }]
       };
