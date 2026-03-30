@@ -64,68 +64,65 @@ async function handleListFolders(args) {
  */
 async function getAllFoldersHierarchy(accessToken, includeItemCounts) {
   try {
-    // Determine select fields based on whether to include counts
     const selectFields = includeItemCounts
       ? 'id,displayName,parentFolderId,childFolderCount,totalItemCount,unreadItemCount'
       : 'id,displayName,parentFolderId,childFolderCount';
-    
-    // Get all mail folders
+
+    const allFolders = await fetchFoldersRecursive(accessToken, 'me/mailFolders', selectFields);
+
+    // Mark top-level folders (those fetched from the root endpoint)
     const response = await callGraphAPI(
       accessToken,
       'GET',
       'me/mailFolders',
       null,
-      { 
-        $top: 100,
-        $select: selectFields
-      }
+      { $top: 100, $select: 'id' }
     );
-    
-    if (!response.value) {
-      return [];
-    }
-    
-    // Get child folders for folders with children
-    const foldersWithChildren = response.value.filter(f => f.childFolderCount > 0);
-    
-    const childFolderPromises = foldersWithChildren.map(async (folder) => {
-      try {
-        const childResponse = await callGraphAPI(
-          accessToken,
-          'GET',
-          `me/mailFolders/${folder.id}/childFolders`,
-          null,
-          { $select: selectFields }
-        );
-        
-        // Add parent folder info to each child
-        const childFolders = childResponse.value || [];
-        childFolders.forEach(child => {
-          child.parentFolder = folder.displayName;
-        });
-        
-        return childFolders;
-      } catch (error) {
-        console.error(`Error getting child folders for "${folder.displayName}": ${error.message}`);
-        return [];
-      }
-    });
-    
-    const childFolders = await Promise.all(childFolderPromises);
-    const allChildFolders = childFolders.flat();
-    
-    // Add top-level flag to parent folders
-    const topLevelFolders = response.value.map(folder => ({
+    const topLevelIds = new Set((response.value || []).map(f => f.id));
+
+    return allFolders.map(folder => ({
       ...folder,
-      isTopLevel: true
+      isTopLevel: topLevelIds.has(folder.id)
     }));
-    
-    // Combine all folders
-    return [...topLevelFolders, ...allChildFolders];
   } catch (error) {
     console.error(`Error getting all folders: ${error.message}`);
     throw error;
   }
+}
+
+/**
+ * Recursively fetch folders and all their descendants
+ */
+async function fetchFoldersRecursive(accessToken, endpoint, selectFields) {
+  const response = await callGraphAPI(
+    accessToken,
+    'GET',
+    endpoint,
+    null,
+    { $top: 100, $select: selectFields }
+  );
+
+  if (!response.value || response.value.length === 0) {
+    return [];
+  }
+
+  const folders = response.value;
+  const withChildren = folders.filter(f => f.childFolderCount > 0);
+
+  const childResults = await Promise.all(withChildren.map(async (folder) => {
+    try {
+      return await fetchFoldersRecursive(
+        accessToken,
+        `me/mailFolders/${folder.id}/childFolders`,
+        selectFields
+      );
+    } catch (error) {
+      console.error(`Error getting child folders for "${folder.displayName}": ${error.message}`);
+      return [];
+    }
+  }));
+
+  return [...folders, ...childResults.flat()];
 }
 
 /**
