@@ -8,10 +8,14 @@ class TokenStorage {
     const tenantId = process.env.MS_TENANT_ID || 'common';
     const authorityHost = (process.env.MS_AUTHORITY_HOST || 'https://login.microsoftonline.com').replace(/\/+$/, '');
 
+    // Support both MS_CLIENT_ID (auth server / .env) and OUTLOOK_CLIENT_ID (Claude Desktop config)
+    const clientId = process.env.MS_CLIENT_ID || process.env.OUTLOOK_CLIENT_ID;
+    const clientSecret = process.env.MS_CLIENT_SECRET || process.env.OUTLOOK_CLIENT_SECRET;
+
     this.config = {
       tokenStorePath: path.join(process.env.HOME || process.env.USERPROFILE, '.outlook-mcp-tokens.json'),
-      clientId: process.env.MS_CLIENT_ID,
-      clientSecret: process.env.MS_CLIENT_SECRET,
+      clientId,
+      clientSecret,
       redirectUri: process.env.MS_REDIRECT_URI || 'http://localhost:3333/auth/callback',
       scopes: (process.env.MS_SCOPES || 'offline_access User.Read Mail.Read').split(' '),
       tenantId,
@@ -24,7 +28,7 @@ class TokenStorage {
     this._refreshPromise = null;
 
     if (!this.config.clientId || !this.config.clientSecret) {
-      console.warn("TokenStorage: MS_CLIENT_ID or MS_CLIENT_SECRET is not configured. Token operations might fail.");
+      console.warn("TokenStorage: Client ID or Secret is not configured (checked MS_CLIENT_ID/OUTLOOK_CLIENT_ID). Token refresh will fail.");
     }
   }
 

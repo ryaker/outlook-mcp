@@ -7,6 +7,7 @@ const handleReadEmail = require('./read');
 const handleSendEmail = require('./send');
 const handleDraftEmail = require('./draft');
 const handleMarkAsRead = require('./mark-as-read');
+const handleDeleteEmail = require('./delete');
 
 // Email tool definitions
 const emailTools = [
@@ -189,6 +190,25 @@ const emailTools = [
       required: ["id"]
     },
     handler: handleMarkAsRead
+  },
+  {
+    name: "delete-email",
+    description: "Deletes an email by moving it to Deleted Items (trash). Use permanent=true to hard delete.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "ID of the email to delete"
+        },
+        permanent: {
+          type: "boolean",
+          description: "If true, permanently delete the email instead of moving to Deleted Items. Default: false"
+        }
+      },
+      required: ["id"]
+    },
+    handler: handleDeleteEmail
   }
 ];
 
@@ -199,5 +219,6 @@ module.exports = {
   handleReadEmail,
   handleSendEmail,
   handleDraftEmail,
-  handleMarkAsRead
+  handleMarkAsRead,
+  handleDeleteEmail
 };
