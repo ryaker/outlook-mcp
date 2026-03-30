@@ -112,13 +112,16 @@ async function getFolderIdByName(accessToken, folderName) {
 
     if (allFolders.length > 0) {
       const lowerFolderName = folderName.toLowerCase();
-      const matchingFolder = allFolders.find(
+      const matches = allFolders.filter(
         folder => folder.displayName.toLowerCase() === lowerFolderName
       );
 
-      if (matchingFolder) {
-        console.error(`Found match for "${folderName}" with ID: ${matchingFolder.id}`);
-        return matchingFolder.id;
+      if (matches.length === 1) {
+        console.error(`Found match for "${folderName}" with ID: ${matches[0].id}`);
+        return matches[0].id;
+      } else if (matches.length > 1) {
+        console.error(`Ambiguous folder name "${folderName}" — ${matches.length} folders match: ${matches.map(f => f.id).join(', ')}`);
+        return null;
       }
     }
     
@@ -188,5 +191,6 @@ module.exports = {
   WELL_KNOWN_FOLDERS,
   resolveFolderPath,
   getFolderIdByName,
-  getAllFolders
+  getAllFolders,
+  fetchFoldersRecursive
 };
