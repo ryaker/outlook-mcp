@@ -95,7 +95,8 @@ A comprehensive MCP (Model Context Protocol) server that connects Claude with Mi
 | `create-folder` | Create mail folder |
 | `move-emails` | Move emails between folders |
 | `list-rules` | List inbox rules |
-| `create-rule` | Create inbox rule |
+| `create-rule` | Create inbox rule (conditions: from, to, subject, body, subject-or-body, has attachment) |
+| `edit-rule-sequence` | Change rule execution order |
 
 ### OneDrive
 | Tool | Description |
@@ -161,10 +162,11 @@ npm install
 3. Add these permissions:
    - `offline_access`
    - `User.Read`
-   - `Mail.Read`, `Mail.ReadWrite`, `Mail.Send`
+   - `Mail.Read`, `Mail.ReadWrite`, `Mail.Send` (`Mail.ReadWrite` required for managing inbox rules)
    - `Calendars.Read`, `Calendars.ReadWrite`
    - `Files.Read`, `Files.ReadWrite`
 4. Click "Add permissions"
+5. Click "Grant admin consent for [your organization]" so permissions are pre-approved
 
 **For Power Automate** (optional):
 - Requires additional Azure AD configuration with Flow API scope

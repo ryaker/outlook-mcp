@@ -16,6 +16,9 @@ async function handleCreateRule(args) {
     name,
     fromAddresses,
     containsSubject,
+    bodyContains,
+    bodyOrSubjectContains,
+    sentToAddresses,
     hasAttachments,
     moveToFolder,
     markAsRead,
@@ -43,7 +46,7 @@ async function handleCreateRule(args) {
   }
   
   // Validate that at least one condition or action is specified
-  const hasCondition = fromAddresses || containsSubject || hasAttachments === true;
+  const hasCondition = fromAddresses || containsSubject || bodyContains || bodyOrSubjectContains || sentToAddresses || hasAttachments === true;
   const hasAction = moveToFolder || markAsRead === true;
   
   if (!hasCondition) {
@@ -73,13 +76,16 @@ async function handleCreateRule(args) {
       name,
       fromAddresses,
       containsSubject,
+      bodyContains,
+      bodyOrSubjectContains,
+      sentToAddresses,
       hasAttachments,
       moveToFolder,
       markAsRead,
       isEnabled,
       sequence
     });
-    
+
     let responseText = result.message;
     
     // Add a tip about sequence if it wasn't provided
@@ -124,6 +130,9 @@ async function createInboxRule(accessToken, ruleOptions) {
       name,
       fromAddresses,
       containsSubject,
+      bodyContains,
+      bodyOrSubjectContains,
+      sentToAddresses,
       hasAttachments,
       moveToFolder,
       markAsRead,
@@ -188,7 +197,25 @@ async function createInboxRule(accessToken, ruleOptions) {
     if (containsSubject) {
       rule.conditions.subjectContains = [containsSubject];
     }
-    
+
+    if (bodyContains) {
+      rule.conditions.bodyContains = [bodyContains];
+    }
+
+    if (bodyOrSubjectContains) {
+      rule.conditions.bodyOrSubjectContains = [bodyOrSubjectContains];
+    }
+
+    if (sentToAddresses) {
+      const toAddresses = sentToAddresses.split(',')
+        .map(email => email.trim())
+        .filter(email => email)
+        .map(email => ({ emailAddress: { address: email } }));
+      if (toAddresses.length > 0) {
+        rule.conditions.sentToAddresses = toAddresses;
+      }
+    }
+
     if (hasAttachments === true) {
       rule.conditions.hasAttachment = true;
     }

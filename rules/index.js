@@ -117,9 +117,21 @@ const rulesTools = [
           type: "string",
           description: "Comma-separated list of sender email addresses for the rule"
         },
+        sentToAddresses: {
+          type: "string",
+          description: "Comma-separated list of recipient (To) email addresses the email must be sent to"
+        },
         containsSubject: {
           type: "string",
           description: "Subject text the email must contain"
+        },
+        bodyContains: {
+          type: "string",
+          description: "Text the email body must contain"
+        },
+        bodyOrSubjectContains: {
+          type: "string",
+          description: "Text that must appear in either the subject or body of the email"
         },
         hasAttachments: {
           type: "boolean",
