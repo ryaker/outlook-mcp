@@ -3,6 +3,7 @@
  */
 const { callGraphAPI } = require('../utils/graph-api');
 const { ensureAuthenticated } = require('../auth');
+const { fetchFoldersRecursive } = require('../email/folder-utils');
 
 /**
  * List folders handler
@@ -70,59 +71,20 @@ async function getAllFoldersHierarchy(accessToken, includeItemCounts) {
 
     const allFolders = await fetchFoldersRecursive(accessToken, 'me/mailFolders', selectFields);
 
-    // Mark top-level folders (those fetched from the root endpoint)
-    const response = await callGraphAPI(
-      accessToken,
-      'GET',
-      'me/mailFolders',
-      null,
-      { $top: 100, $select: 'id' }
-    );
-    const topLevelIds = new Set((response.value || []).map(f => f.id));
+    // Derive isTopLevel and parentFolder from the data itself —
+    // a folder is top-level if its parentFolderId isn't any folder we fetched
+    const allIds = new Set(allFolders.map(f => f.id));
+    const nameById = new Map(allFolders.map(f => [f.id, f.displayName]));
 
     return allFolders.map(folder => ({
       ...folder,
-      isTopLevel: topLevelIds.has(folder.id)
+      isTopLevel: !allIds.has(folder.parentFolderId),
+      parentFolder: nameById.get(folder.parentFolderId) || null
     }));
   } catch (error) {
     console.error(`Error getting all folders: ${error.message}`);
     throw error;
   }
-}
-
-/**
- * Recursively fetch folders and all their descendants
- */
-async function fetchFoldersRecursive(accessToken, endpoint, selectFields) {
-  const response = await callGraphAPI(
-    accessToken,
-    'GET',
-    endpoint,
-    null,
-    { $top: 100, $select: selectFields }
-  );
-
-  if (!response.value || response.value.length === 0) {
-    return [];
-  }
-
-  const folders = response.value;
-  const withChildren = folders.filter(f => f.childFolderCount > 0);
-
-  const childResults = await Promise.all(withChildren.map(async (folder) => {
-    try {
-      return await fetchFoldersRecursive(
-        accessToken,
-        `me/mailFolders/${folder.id}/childFolders`,
-        selectFields
-      );
-    } catch (error) {
-      console.error(`Error getting child folders for "${folder.displayName}": ${error.message}`);
-      return [];
-    }
-  }));
-
-  return [...folders, ...childResults.flat()];
 }
 
 /**
