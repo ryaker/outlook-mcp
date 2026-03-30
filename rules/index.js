@@ -1,11 +1,8 @@
 /**
  * Email rules management module for Outlook MCP server
  */
-const handleListRules = require('./list');
+const { handleListRules, getInboxRules } = require('./list');
 const handleCreateRule = require('./create');
-
-// Import getInboxRules for the edit sequence tool
-const { getInboxRules } = require('./list');
 
 /**
  * Edit rule sequence handler
