@@ -2,7 +2,9 @@
  * Calendar module for Outlook MCP server
  */
 const handleListEvents = require('./list');
+const handleAcceptEvent = require('./accept');
 const handleDeclineEvent = require('./decline');
+const handleTentativeEvent = require('./tentative');
 const handleCreateEvent = require('./create');
 const handleCancelEvent = require('./cancel');
 const handleDeleteEvent = require('./delete');
@@ -26,11 +28,53 @@ const calendarTools = [
         endDateTime: {
           type: "string",
           description: "ISO 8601 end date/time for the query range (default: startDateTime + 30 days)"
+        },
+        timezone: {
+          type: "string",
+          description: "IANA timezone for displayed times (e.g. 'Europe/Oslo', 'America/New_York'). Defaults to OUTLOOK_TIMEZONE env var, or UTC if unset."
         }
       },
       required: []
     },
     handler: handleListEvents
+  },
+  {
+    name: "accept-event",
+    description: "Accepts a calendar event",
+    inputSchema: {
+      type: "object",
+      properties: {
+        eventId: {
+          type: "string",
+          description: "The ID of the event to accept"
+        },
+        comment: {
+          type: "string",
+          description: "Optional comment for accepting the event"
+        }
+      },
+      required: ["eventId"]
+    },
+    handler: handleAcceptEvent
+  },
+  {
+    name: "tentative-event",
+    description: "Tentatively accepts a calendar event",
+    inputSchema: {
+      type: "object",
+      properties: {
+        eventId: {
+          type: "string",
+          description: "The ID of the event to tentatively accept"
+        },
+        comment: {
+          type: "string",
+          description: "Optional comment for tentatively accepting the event"
+        }
+      },
+      required: ["eventId"]
+    },
+    handler: handleTentativeEvent
   },
   {
     name: "decline-event",
@@ -124,7 +168,9 @@ const calendarTools = [
 module.exports = {
   calendarTools,
   handleListEvents,
+  handleAcceptEvent,
   handleDeclineEvent,
+  handleTentativeEvent,
   handleCreateEvent,
   handleCancelEvent,
   handleDeleteEvent

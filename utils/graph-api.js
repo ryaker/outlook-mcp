@@ -14,7 +14,7 @@ const mockData = require('./mock-data');
  * @param {object} queryParams - Query parameters
  * @returns {Promise<object>} - The API response
  */
-async function callGraphAPI(accessToken, method, path, data = null, queryParams = {}) {
+async function callGraphAPI(accessToken, method, path, data = null, queryParams = {}, extraHeaders = {}) {
   // For test tokens, we'll simulate the API call
   if (config.USE_TEST_MODE && accessToken.startsWith('test_access_token_')) {
     console.error(`TEST MODE: Simulating ${method} ${path} API call`);
@@ -40,26 +40,39 @@ async function callGraphAPI(accessToken, method, path, data = null, queryParams 
       // Build query string from parameters with special handling for OData filters
       let queryString = '';
       if (Object.keys(queryParams).length > 0) {
-        // Handle $filter parameter specially to ensure proper URI encoding
+        // Handle $filter and $search parameters specially to ensure proper URI encoding
         const filter = queryParams.$filter;
+        const search = queryParams.$search;
         if (filter) {
-          delete queryParams.$filter; // Remove from regular params
+          delete queryParams.$filter;
         }
-        
+        if (search) {
+          delete queryParams.$search;
+        }
+
         // Build query string with proper encoding for regular params
         const params = new URLSearchParams();
         for (const [key, value] of Object.entries(queryParams)) {
           params.append(key, value);
         }
-        
+
         queryString = params.toString();
-        
+
         // Add filter parameter separately with proper encoding
         if (filter) {
           if (queryString) {
             queryString += `&$filter=${encodeURIComponent(filter)}`;
           } else {
             queryString = `$filter=${encodeURIComponent(filter)}`;
+          }
+        }
+
+        // Add search parameter separately with proper encoding
+        if (search) {
+          if (queryString) {
+            queryString += `&$search=${encodeURIComponent(search)}`;
+          } else {
+            queryString = `$search=${encodeURIComponent(search)}`;
           }
         }
         
@@ -79,7 +92,8 @@ async function callGraphAPI(accessToken, method, path, data = null, queryParams 
         method: method,
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...extraHeaders
         }
       };
       
@@ -133,7 +147,7 @@ async function callGraphAPI(accessToken, method, path, data = null, queryParams 
  * @param {number} maxCount - Maximum number of items to retrieve (0 = all)
  * @returns {Promise<object>} - Combined API response with all items
  */
-async function callGraphAPIPaginated(accessToken, method, path, queryParams = {}, maxCount = 0) {
+async function callGraphAPIPaginated(accessToken, method, path, queryParams = {}, maxCount = 0, extraHeaders = {}) {
   if (method !== 'GET') {
     throw new Error('Pagination only supports GET requests');
   }
@@ -146,7 +160,7 @@ async function callGraphAPIPaginated(accessToken, method, path, queryParams = {}
   try {
     do {
       // Make API call
-      const response = await callGraphAPI(accessToken, method, currentUrl, null, currentParams);
+      const response = await callGraphAPI(accessToken, method, currentUrl, null, currentParams, extraHeaders);
       
       // Add items from this page
       if (response.value && Array.isArray(response.value)) {
