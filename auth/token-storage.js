@@ -264,6 +264,120 @@ class TokenStorage {
     });
   }
 
+  /**
+   * Initiates the device code flow.
+   * @returns {Promise<object>} - { user_code, verification_uri, device_code, interval, expires_in, message }
+   */
+  async initiateDeviceCodeFlow() {
+    const postData = querystring.stringify({
+      client_id: this.config.clientId,
+      scope: this.config.scopes.join(' ')
+    });
+
+    const tokenUrl = new URL(this.config.tokenEndpoint);
+    const deviceCodeUrl = `${tokenUrl.origin}${tokenUrl.pathname.replace('/token', '/devicecode')}`;
+
+    return new Promise((resolve, reject) => {
+      const req = https.request(deviceCodeUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(postData)
+        }
+      }, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => {
+          try {
+            const body = JSON.parse(data);
+            if (res.statusCode >= 200 && res.statusCode < 300) {
+              resolve(body);
+            } else {
+              reject(new Error(body.error_description || `Device code request failed: ${res.statusCode}`));
+            }
+          } catch (e) {
+            reject(new Error(`Failed to parse device code response: ${e.message}`));
+          }
+        });
+      });
+      req.on('error', reject);
+      req.write(postData);
+      req.end();
+    });
+  }
+
+  /**
+   * Polls the token endpoint waiting for the user to complete device code auth.
+   * @param {string} deviceCode - The device_code from initiateDeviceCodeFlow
+   * @param {number} interval - Polling interval in seconds
+   * @param {number} expiresIn - Timeout in seconds
+   * @returns {Promise<object>} - The token response
+   */
+  async pollForDeviceCodeToken(deviceCode, interval = 5, expiresIn = 900) {
+    const deadline = Date.now() + expiresIn * 1000;
+    let pollInterval = Math.max(interval, 5) * 1000;
+
+    const postData = querystring.stringify({
+      client_id: this.config.clientId,
+      grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+      device_code: deviceCode
+    });
+
+    while (Date.now() < deadline) {
+      const result = await new Promise((resolve, reject) => {
+        const req = https.request(this.config.tokenEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Content-Length': Buffer.byteLength(postData)
+          }
+        }, (res) => {
+          let data = '';
+          res.on('data', (chunk) => data += chunk);
+          res.on('end', () => {
+            try {
+              resolve({ statusCode: res.statusCode, body: JSON.parse(data) });
+            } catch (e) {
+              reject(new Error(`Failed to parse poll response: ${e.message}`));
+            }
+          });
+        });
+        req.on('error', reject);
+        req.write(postData);
+        req.end();
+      });
+
+      if (result.statusCode >= 200 && result.statusCode < 300) {
+        this.tokens = {
+          access_token: result.body.access_token,
+          refresh_token: result.body.refresh_token,
+          expires_in: result.body.expires_in,
+          expires_at: Date.now() + (result.body.expires_in * 1000),
+          scope: result.body.scope,
+          token_type: result.body.token_type
+        };
+        await this._saveTokensToFile();
+        console.log('Device code flow: tokens obtained and saved.');
+        return this.tokens;
+      }
+
+      const error = result.body.error;
+      if (error === 'authorization_pending') {
+        await new Promise(r => setTimeout(r, pollInterval));
+        continue;
+      } else if (error === 'slow_down') {
+        // RFC 8628 §3.5: increase interval by 5s for this and all subsequent requests
+        pollInterval += 5000;
+        await new Promise(r => setTimeout(r, pollInterval));
+        continue;
+      } else {
+        throw new Error(result.body.error_description || `Device code auth failed: ${error}`);
+      }
+    }
+
+    throw new Error('Device code flow timed out. Please try again.');
+  }
+
   // Utility to clear tokens, e.g., for logout or forcing re-auth
   async clearTokens() {
     this.tokens = null;

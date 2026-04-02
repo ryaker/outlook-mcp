@@ -14,13 +14,18 @@ module.exports = {
   
   // Test mode setting
   USE_TEST_MODE: process.env.USE_TEST_MODE === 'true',
-  
+
+  // Authentication flow: 'device_code' or 'authorization_code' (default)
+  AUTH_FLOW: process.env.AUTH_FLOW || 'authorization_code',
+
   // Authentication configuration
   AUTH_CONFIG: {
-    clientId: process.env.OUTLOOK_CLIENT_ID || '',
-    clientSecret: process.env.OUTLOOK_CLIENT_SECRET || '',
+    clientId: process.env.OUTLOOK_CLIENT_ID || process.env.MS_CLIENT_ID || '',
+    clientSecret: process.env.OUTLOOK_CLIENT_SECRET || process.env.MS_CLIENT_SECRET || '',
+    tenantId: process.env.MS_TENANT_ID || 'common',
+    authorityHost: (process.env.MS_AUTHORITY_HOST || 'https://login.microsoftonline.com').replace(/\/+$/, ''),
     redirectUri: 'http://localhost:3333/auth/callback',
-    scopes: ['Mail.Read', 'Mail.ReadWrite', 'Mail.Send', 'User.Read', 'Calendars.Read', 'Calendars.ReadWrite', 'Files.Read', 'Files.ReadWrite'],
+    scopes: ['offline_access', 'Mail.Read', 'Mail.ReadWrite', 'Mail.Send', 'User.Read', 'Calendars.Read', 'Calendars.ReadWrite', 'Files.Read', 'Files.ReadWrite'],
     tokenStorePath: path.join(homeDir, '.outlook-mcp-tokens.json'),
     authServerUrl: 'http://localhost:3333'
   },
