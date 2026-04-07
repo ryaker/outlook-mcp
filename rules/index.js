@@ -3,6 +3,7 @@
  */
 const { handleListRules, getInboxRules } = require('./list');
 const handleCreateRule = require('./create');
+const handleDeleteRule = require('./delete');
 
 /**
  * Edit rule sequence handler
@@ -161,6 +162,21 @@ const rulesTools = [
       required: ["ruleName", "sequence"]
     },
     handler: handleEditRuleSequence
+  },
+  {
+    name: "delete-rule",
+    description: "Deletes an existing inbox rule by name",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ruleName: {
+          type: "string",
+          description: "Exact name of the rule to delete (use 'list-rules' to see names)"
+        }
+      },
+      required: ["ruleName"]
+    },
+    handler: handleDeleteRule
   }
 ];
 
@@ -168,5 +184,6 @@ module.exports = {
   rulesTools,
   handleListRules,
   handleCreateRule,
-  handleEditRuleSequence
+  handleEditRuleSequence,
+  handleDeleteRule
 };
