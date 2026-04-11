@@ -1,8 +1,11 @@
 /**
  * Email rules management module for Outlook MCP server
  */
+const { callGraphAPI } = require('../utils/graph-api');
+const { ensureAuthenticated } = require('../auth');
 const handleListRules = require('./list');
 const handleCreateRule = require('./create');
+const handleDeleteRule = require('./delete');
 
 // Import getInboxRules for the edit sequence tool
 const { getInboxRules } = require('./list');
@@ -164,6 +167,25 @@ const rulesTools = [
       required: ["ruleName", "sequence"]
     },
     handler: handleEditRuleSequence
+  },
+  {
+    name: "delete-rule",
+    description: "Deletes an existing inbox rule by name or ID. If multiple rules share the same name, the tool returns a list and asks you to re-call with a specific ruleId.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ruleName: {
+          type: "string",
+          description: "Name of the rule to delete. If multiple rules share this name, the tool will return the list and ask for a specific ID."
+        },
+        ruleId: {
+          type: "string",
+          description: "Specific rule ID (from Microsoft Graph) to delete. Use this when multiple rules share the same name."
+        }
+      },
+      required: []
+    },
+    handler: handleDeleteRule
   }
 ];
 
@@ -171,5 +193,6 @@ module.exports = {
   rulesTools,
   handleListRules,
   handleCreateRule,
+  handleDeleteRule,
   handleEditRuleSequence
 };
