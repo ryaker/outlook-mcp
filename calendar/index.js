@@ -4,8 +4,10 @@
 const handleListEvents = require('./list');
 const handleDeclineEvent = require('./decline');
 const handleCreateEvent = require('./create');
+const handleUpdateEvent = require('./update');
 const handleCancelEvent = require('./cancel');
 const handleDeleteEvent = require('./delete');
+const { RECURRENCE_SCHEMA } = require('./recurrence');
 
 // Calendar tool definitions
 const calendarTools = [
@@ -79,11 +81,71 @@ const calendarTools = [
         body: {
           type: "string",
           description: "Optional body content for the event"
-        }
+        },
+        isAllDay: {
+          type: "boolean",
+          description: "Mark this event as an all-day event. Requires start/end to be at midnight in the supplied timeZone."
+        },
+        showAs: {
+          type: "string",
+          enum: ["free", "tentative", "busy", "oof", "workingElsewhere", "unknown"],
+          description: "Free/busy status to publish for this event (default: busy)"
+        },
+        recurrence: RECURRENCE_SCHEMA
       },
       required: ["subject", "start", "end"]
     },
     handler: handleCreateEvent
+  },
+  {
+    name: "update-event",
+    description: "Updates fields on an existing calendar event. Only provided fields are patched.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        eventId: {
+          type: "string",
+          description: "The ID of the event to update"
+        },
+        subject: {
+          type: "string",
+          description: "New subject for the event"
+        },
+        start: {
+          type: "string",
+          description: "New start time in ISO 8601 format"
+        },
+        end: {
+          type: "string",
+          description: "New end time in ISO 8601 format"
+        },
+        location: {
+          type: "string",
+          description: "New location display name"
+        },
+        attendees: {
+          type: "array",
+          items: { type: "string" },
+          description: "Replacement list of attendee email addresses (replaces the existing list)"
+        },
+        body: {
+          type: "string",
+          description: "New body content (HTML)"
+        },
+        isAllDay: {
+          type: "boolean",
+          description: "Mark this event as all-day. If true, any provided start/end must be at midnight in the supplied timeZone."
+        },
+        showAs: {
+          type: "string",
+          enum: ["free", "tentative", "busy", "oof", "workingElsewhere", "unknown"],
+          description: "Free/busy status to publish for this event"
+        },
+        recurrence: RECURRENCE_SCHEMA
+      },
+      required: ["eventId"]
+    },
+    handler: handleUpdateEvent
   },
   {
     name: "cancel-event",
@@ -126,6 +188,7 @@ module.exports = {
   handleListEvents,
   handleDeclineEvent,
   handleCreateEvent,
+  handleUpdateEvent,
   handleCancelEvent,
   handleDeleteEvent
 };

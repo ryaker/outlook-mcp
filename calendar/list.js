@@ -98,11 +98,24 @@ async function handleListEvents(args) {
         return `${dateTime} (${timeZone})`;
       };
 
-      const startDate = formatDateTime(event.start);
-      const endDate = formatDateTime(event.end);
+      const formatAllDay = (dateTimeData) => {
+        if (!dateTimeData) return '';
+        const dateTime = typeof dateTimeData === 'string' ? dateTimeData : (dateTimeData.dateTime || '');
+        if (!dateTime) return '';
+        const datePart = dateTime.split('T')[0];
+        const parsed = new Date(datePart + 'T00:00:00Z');
+        if (isNaN(parsed.getTime())) return datePart;
+        return parsed.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+      };
+
+      const isAllDay = event.isAllDay === true;
+      const startDate = isAllDay ? formatAllDay(event.start) : formatDateTime(event.start);
+      const endDate = isAllDay ? formatAllDay(event.end) : formatDateTime(event.end);
       const location = event.location?.displayName || 'No location';
-      
-      return `${index + 1}. ${event.subject} - Location: ${location}\nStart: ${startDate}\nEnd: ${endDate}\nSummary: ${event.bodyPreview}\nID: ${event.id}\n`;
+      const subjectLine = isAllDay ? `${event.subject} [All day]` : event.subject;
+      const statusLine = event.showAs ? `\nStatus: ${event.showAs}` : '';
+
+      return `${index + 1}. ${subjectLine} - Location: ${location}\nStart: ${startDate}\nEnd: ${endDate}${statusLine}\nSummary: ${event.bodyPreview}\nID: ${event.id}\n`;
     }).join("\n");
 
     return {

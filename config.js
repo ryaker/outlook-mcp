@@ -28,15 +28,12 @@ module.exports = {
   // Microsoft Graph API
   GRAPH_API_ENDPOINT: 'https://graph.microsoft.com/v1.0/',
   
-  // Calendar constants
-  CALENDAR_SELECT_FIELDS: 'id,subject,start,end,location,bodyPreview,isAllDay,recurrence,attendees',
-
   // Email constants
   EMAIL_SELECT_FIELDS: 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,bodyPreview,hasAttachments,importance,isRead',
   EMAIL_DETAIL_FIELDS: 'id,subject,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,bodyPreview,body,hasAttachments,importance,isRead,internetMessageHeaders',
-  
+
   // Calendar constants
-  CALENDAR_SELECT_FIELDS: 'id,subject,bodyPreview,start,end,location,organizer,attendees,isAllDay,isCancelled',
+  CALENDAR_SELECT_FIELDS: 'id,subject,bodyPreview,start,end,location,organizer,attendees,isAllDay,isCancelled,showAs',
   
   // Pagination
   DEFAULT_PAGE_SIZE: 25,
