@@ -49,6 +49,8 @@ const AUTH_CONFIG = {
     'Mail.Read',
     'Mail.ReadWrite',
     'Mail.Send',
+    'Calendars.Read',
+    'Calendars.ReadWrite',
     'MailboxSettings.ReadWrite'
   ],
   tokenStorePath: path.join(process.env.HOME || process.env.USERPROFILE, '.outlook-mcp-tokens.json')
