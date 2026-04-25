@@ -6,6 +6,7 @@
  * Microsoft 365 services (Outlook, OneDrive, Power Automate)
  * through the Microsoft Graph API and Flow API.
  */
+require('dotenv').config({ path: __dirname + '/.env' });
 const { Server } = require("@modelcontextprotocol/sdk/server/index.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const config = require('./config');

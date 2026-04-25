@@ -1,11 +1,9 @@
 /**
  * Email rules management module for Outlook MCP server
  */
-const handleListRules = require('./list');
+const { handleListRules, getInboxRules } = require('./list');
 const handleCreateRule = require('./create');
-
-// Import getInboxRules for the edit sequence tool
-const { getInboxRules } = require('./list');
+const handleDeleteRule = require('./delete');
 
 /**
  * Edit rule sequence handler
@@ -164,6 +162,21 @@ const rulesTools = [
       required: ["ruleName", "sequence"]
     },
     handler: handleEditRuleSequence
+  },
+  {
+    name: "delete-rule",
+    description: "Deletes an existing inbox rule by name",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ruleName: {
+          type: "string",
+          description: "Exact name of the rule to delete (use 'list-rules' to see names)"
+        }
+      },
+      required: ["ruleName"]
+    },
+    handler: handleDeleteRule
   }
 ];
 
@@ -171,5 +184,6 @@ module.exports = {
   rulesTools,
   handleListRules,
   handleCreateRule,
-  handleEditRuleSequence
+  handleEditRuleSequence,
+  handleDeleteRule
 };
