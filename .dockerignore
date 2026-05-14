@@ -1,0 +1,11 @@
+node_modules
+dist
+.git
+.env
+.env.*
+*.token.json
+.outlook-mcp-tokens.json
+.vscode
+.idea
+.DS_Store
+coverage

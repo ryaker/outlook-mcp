@@ -1,37 +1,42 @@
 {
-  "name": "m365-mcp",
-  "version": "2.0.0",
-  "description": "MCP server for Claude to access Microsoft 365 (Outlook, OneDrive, Power Automate) via Microsoft Graph API",
-  "main": "index.js",
+  "name": "outlook-mcp",
+  "version": "3.0.0",
+  "description": "MCP server for Microsoft 365 (Outlook, OneDrive, Power Automate) — rebuild in progress",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "outlook-mcp": "dist/index.js"
+  },
   "scripts": {
-    "start": "node index.js",
-    "auth-server": "node outlook-auth-server.js",
-    "test-mode": "USE_TEST_MODE=true node index.js",
-    "inspect": "npx @modelcontextprotocol/inspector node index.js",
-    "test": "jest"
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "start:stdio": "MCP_TRANSPORT=stdio node dist/index.js",
+    "start:http": "MCP_TRANSPORT=http node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
-    "claude",
+    "mcp",
     "outlook",
     "onedrive",
-    "power-automate",
     "microsoft-365",
-    "mcp",
-    "microsoft-graph",
-    "email"
+    "microsoft-graph"
   ],
-  "author": "",
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
-    "dotenv": "^16.6.1"
+    "dotenv": "^16.6.1",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@modelcontextprotocol/inspector": "^0.10.2",
-    "jest": "^29.7.0",
-    "supertest": "^7.0.0"
-  },
-  "engines": {
-    "node": ">=14.0.0"
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
   }
 }
