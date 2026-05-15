@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "slug": "auth-multi-account",
+  "title": "Auth + multi-account token storage (v3)",
+  "parent": null,
+  "created_at": "2026-05-14T23:37:14Z",
+  "updated_at": "2026-05-15T05:40:43Z",
+  "current_phase": "design",
+  "status": "in-progress",
+  "phases": [
+    {
+      "phase": "design",
+      "iteration": 1,
+      "status": "complete",
+      "agent": "inline",
+      "model": "claude-opus-4-7",
+      "started_at": "2026-05-14T23:38:46Z",
+      "ended_at": "2026-05-15T05:40:43Z",
+      "artifact": ".agent-workspace/designs/2026-05-14-auth-multi-account.md",
+      "summary": "TS-strict auth layer using @azure/msal-node device-code flow; keychain-when-available with file fallback (TokenStore interface); always-implicit account with 6 visibility mechanisms incl. meta.actedAs convention + persisted runtime default + 2 default-management tools; scope set: v3-plan with redundant .Read trimmed; Cowork-is-local confirmed via research, no remote store needed; public hosting + headless scheduling explicit future slugs.",
+      "cost": {
+        "input_tokens": null,
+        "output_tokens": null,
+        "cache_read_tokens": null,
+        "cache_write_tokens": null,
+        "estimated_usd": null
+      }
+    }
+  ],
+  "findings": [],
+  "links": {
+    "pr": null,
+    "commit": null,
+    "issue": null
+  },
+  "tags": []
+}
