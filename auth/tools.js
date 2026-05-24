@@ -66,7 +66,7 @@ async function handleCheckAuthStatus() {
     if (!accessToken) {
       console.error('[CHECK-AUTH-STATUS] ensureAuthenticated returned no token');
       return {
-        content: [{ type: "text", text: "Not authenticated" }]
+        content: [{ type: "text", text: "UNAUTHORIZED" }]
       };
     }
     console.error('[CHECK-AUTH-STATUS] Authenticated (token valid or refreshed)');
@@ -76,7 +76,7 @@ async function handleCheckAuthStatus() {
   } catch (error) {
     console.error('[CHECK-AUTH-STATUS] Authentication check failed:', error.message);
     return {
-      content: [{ type: "text", text: "Not authenticated" }]
+      content: [{ type: "text", text: "UNAUTHORIZED" }]
     };
   }
 }
