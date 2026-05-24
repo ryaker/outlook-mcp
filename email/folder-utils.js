@@ -89,7 +89,7 @@ async function getFolderIdByName(accessToken, folderName) {
       'GET',
       'me/mailFolders',
       null,
-      { $top: 100 }
+      { $top: 100, $select: 'id,displayName,childFolderCount' }
     );
     
     if (allFoldersResponse.value) {
@@ -97,13 +97,38 @@ async function getFolderIdByName(accessToken, folderName) {
       const matchingFolder = allFoldersResponse.value.find(
         folder => folder.displayName.toLowerCase() === lowerFolderName
       );
-      
+
       if (matchingFolder) {
         console.error(`Found case-insensitive match for "${folderName}" with ID: ${matchingFolder.id}`);
         return matchingFolder.id;
       }
+
+      // Search child folders of any folder that has children
+      const foldersWithChildren = allFoldersResponse.value.filter(f => f.childFolderCount > 0);
+      for (const parentFolder of foldersWithChildren) {
+        try {
+          const childResponse = await callGraphAPI(
+            accessToken,
+            'GET',
+            `me/mailFolders/${parentFolder.id}/childFolders`,
+            null,
+            { $top: 100 }
+          );
+          if (childResponse.value) {
+            const childMatch = childResponse.value.find(
+              f => f.displayName.toLowerCase() === lowerFolderName
+            );
+            if (childMatch) {
+              console.error(`Found child folder "${folderName}" under "${parentFolder.displayName}" with ID: ${childMatch.id}`);
+              return childMatch.id;
+            }
+          }
+        } catch (err) {
+          console.error(`Error searching child folders of "${parentFolder.displayName}": ${err.message}`);
+        }
+      }
     }
-    
+
     console.error(`No folder found matching "${folderName}"`);
     return null;
   } catch (error) {
