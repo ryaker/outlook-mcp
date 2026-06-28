@@ -7,6 +7,7 @@ A comprehensive MCP (Model Context Protocol) server that connects Claude with Mi
 ## Supported Services
 
 - **Outlook** - Email, calendar, folders, and rules
+- **Microsoft To Do** - Task lists and tasks
 - **OneDrive** - Files, folders, search, and sharing
 - **Power Automate** - Flows, environments, and run history
 
@@ -52,6 +53,10 @@ A comprehensive MCP (Model Context Protocol) server that connects Claude with Mi
 │   ├── upload-large.js      # Chunked upload (>4MB)
 │   ├── share.js             # Create sharing link
 │   └── folder.js            # Create/delete folders
+├── todo/                    # Microsoft To Do functionality
+│   ├── index.js             # To Do exports
+│   ├── lists.js             # List task lists
+│   └── tasks.js             # List tasks in a task list
 ├── power-automate/          # Power Automate functionality
 │   ├── index.js             # Power Automate exports
 │   ├── flow-api.js          # Flow API client
@@ -71,6 +76,7 @@ A comprehensive MCP (Model Context Protocol) server that connects Claude with Mi
 - **Authentication**: OAuth 2.0 authentication with Microsoft Graph API (+ Flow API for Power Automate)
 - **Email Management**: List, search, read, send, and organize emails
 - **Calendar Management**: List, create, accept, decline, and delete calendar events
+- **Microsoft To Do**: List task lists and tasks
 - **OneDrive Integration**: List, search, upload, download, and share files
 - **Power Automate**: List environments/flows, trigger flows, view run history
 - **Modular Structure**: Clean separation of concerns for maintainability
@@ -96,6 +102,12 @@ A comprehensive MCP (Model Context Protocol) server that connects Claude with Mi
 | `move-emails` | Move emails between folders |
 | `list-rules` | List inbox rules |
 | `create-rule` | Create inbox rule |
+
+### Microsoft To Do
+| Tool | Description |
+|------|-------------|
+| `list-todo-lists` | List Microsoft To Do task lists |
+| `list-todo-tasks` | List tasks in a Microsoft To Do task list |
 
 ### OneDrive
 | Tool | Description |
@@ -163,6 +175,7 @@ npm install
    - `User.Read`
    - `Mail.Read`, `Mail.ReadWrite`, `Mail.Send`
    - `Calendars.Read`, `Calendars.ReadWrite`
+   - `Tasks.ReadWrite`
    - `Files.Read`, `Files.ReadWrite`
 4. Click "Add permissions"
 

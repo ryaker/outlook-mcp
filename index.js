@@ -17,6 +17,7 @@ const { emailTools } = require('./email');
 const { folderTools } = require('./folder');
 const { rulesTools } = require('./rules');
 const { onedriveTools } = require('./onedrive');
+const { todoTools } = require('./todo');
 const { powerAutomateTools } = require('./power-automate');
 
 // Log startup information
@@ -31,6 +32,7 @@ const TOOLS = [
   ...folderTools,
   ...rulesTools,
   ...onedriveTools,
+  ...todoTools,
   ...powerAutomateTools
 ];
 
