@@ -129,6 +129,27 @@ function simulateGraphAPIResponse(method, path, data, queryParams) {
           { id: "deleteditems", displayName: "Deleted Items" }
         ]
       };
+    } else if (path === 'me/todo/lists') {
+      return {
+        value: [
+          { id: 'todo-default', displayName: 'Tasks', isOwner: true, wellknownListName: 'defaultList' },
+          { id: 'todo-work', displayName: 'Work', isOwner: true, wellknownListName: 'none' }
+        ]
+      };
+    } else if (/^me\/todo\/lists\/[^/]+\/tasks$/.test(path)) {
+      return {
+        value: [
+          {
+            id: 'todo-task-1',
+            title: 'Simulated To Do task',
+            status: 'notStarted',
+            importance: 'normal',
+            dueDateTime: { dateTime: new Date(Date.now() + 86400000).toISOString(), timeZone: 'UTC' },
+            completedDateTime: null,
+            body: { content: 'Created from mock test mode data.' }
+          }
+        ]
+      };
     }
   } else if (method === 'POST' && path.includes('sendMail')) {
     // Simulate a successful email send
