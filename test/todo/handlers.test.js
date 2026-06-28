@@ -42,11 +42,26 @@ describe('Microsoft To Do handlers', () => {
         'GET',
         'me/todo/lists',
         null,
-        expect.objectContaining({ $top: 5 })
+        { $top: 5 }
       );
       expect(result.content[0].text).toContain('Found 2 Microsoft To Do task lists');
       expect(result.content[0].text).toContain('Tasks');
       expect(result.content[0].text).toContain('ID: list-1');
+    });
+
+    test('does not send $select for todo lists because Graph rejects that query shape', async () => {
+      ensureAuthenticated.mockResolvedValue(mockAccessToken);
+      callGraphAPI.mockResolvedValue({ value: [] });
+
+      await handleListTodoLists({ count: 3 });
+
+      expect(callGraphAPI).toHaveBeenCalledWith(
+        mockAccessToken,
+        'GET',
+        'me/todo/lists',
+        null,
+        { $top: 3 }
+      );
     });
 
     test('returns a helpful empty-state message when no task lists exist', async () => {
@@ -109,12 +124,27 @@ describe('Microsoft To Do handlers', () => {
         'GET',
         'me/todo/lists/list-1/tasks',
         null,
-        expect.objectContaining({ $top: 10 })
+        { $top: 10 }
       );
       expect(result.content[0].text).toContain('Found 2 tasks in Microsoft To Do list list-1');
       expect(result.content[0].text).toContain('Pay rent');
       expect(result.content[0].text).toContain('Status: completed');
       expect(result.content[0].text).toContain('ID: task-2');
+    });
+
+    test('does not send $select for todo tasks because Graph rejects that query shape', async () => {
+      ensureAuthenticated.mockResolvedValue(mockAccessToken);
+      callGraphAPI.mockResolvedValue({ value: [] });
+
+      await handleListTodoTasks({ listId: 'list-1', count: 4 });
+
+      expect(callGraphAPI).toHaveBeenCalledWith(
+        mockAccessToken,
+        'GET',
+        'me/todo/lists/list-1/tasks',
+        null,
+        { $top: 4 }
+      );
     });
 
     test('requires a task list id', async () => {

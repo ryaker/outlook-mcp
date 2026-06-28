@@ -17,7 +17,6 @@ async function handleListTodoLists(args = {}) {
       null,
       {
         $top: count,
-        $select: config.TODO_LIST_SELECT_FIELDS,
       }
     );
 
