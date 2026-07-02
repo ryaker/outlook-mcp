@@ -2,7 +2,10 @@
  * Authentication-related tools for the Outlook MCP server
  */
 const config = require('../config');
-const tokenManager = require('./token-manager');
+const TokenStorage = require('./token-storage');
+
+// Singleton with automatic refresh — same path used by the actual API calls
+const tokenStorage = new TokenStorage();
 
 /**
  * About tool handler
@@ -55,22 +58,26 @@ async function handleAuthenticate(args) {
  */
 async function handleCheckAuthStatus() {
   console.error('[CHECK-AUTH-STATUS] Starting authentication status check');
-  
-  const tokens = tokenManager.loadTokenCache();
-  
-  console.error(`[CHECK-AUTH-STATUS] Tokens loaded: ${tokens ? 'YES' : 'NO'}`);
-  
-  if (!tokens || !tokens.access_token) {
-    console.error('[CHECK-AUTH-STATUS] No valid access token found');
+
+  // Use getValidAccessToken: if the access token expired but a valid
+  // refresh_token exists, it refreshes silently instead of reporting
+  // "Not authenticated".
+  let accessToken = null;
+  try {
+    accessToken = await tokenStorage.getValidAccessToken();
+  } catch (error) {
+    console.error('[CHECK-AUTH-STATUS] Error while validating/refreshing token:', error.message);
+  }
+
+  if (!accessToken) {
+    console.error('[CHECK-AUTH-STATUS] No valid access token (and refresh unavailable/failed)');
     return {
       content: [{ type: "text", text: "Not authenticated" }]
     };
   }
-  
-  console.error('[CHECK-AUTH-STATUS] Access token present');
-  console.error(`[CHECK-AUTH-STATUS] Token expires at: ${tokens.expires_at}`);
-  console.error(`[CHECK-AUTH-STATUS] Current time: ${Date.now()}`);
-  
+
+  console.error('[CHECK-AUTH-STATUS] Valid access token available (refreshed if needed)');
+
   return {
     content: [{ type: "text", text: "Authenticated and ready" }]
   };
