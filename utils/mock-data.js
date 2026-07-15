@@ -14,6 +14,32 @@ function simulateGraphAPIResponse(method, path, data, queryParams) {
   console.error(`Simulating response for: ${method} ${path}`);
   
   if (method === 'GET') {
+    if (path.includes('/attachments/')) {
+      // Single attachment download
+      return {
+        '@odata.type': '#microsoft.graph.fileAttachment',
+        id: 'simulated-attachment-1',
+        name: 'simulated-report.pdf',
+        contentType: 'application/pdf',
+        size: 24,
+        isInline: false,
+        contentBytes: Buffer.from('Simulated PDF content :)').toString('base64')
+      };
+    }
+    if (path.includes('/attachments')) {
+      // Attachment listing
+      return {
+        value: [
+          {
+            id: 'simulated-attachment-1',
+            name: 'simulated-report.pdf',
+            contentType: 'application/pdf',
+            size: 24,
+            isInline: false
+          }
+        ]
+      };
+    }
     if (path.includes('messages') && !path.includes('sendMail')) {
       // Simulate a successful email list/search response
       if (path.includes('/messages/')) {
@@ -41,7 +67,7 @@ function simulateGraphAPIResponse(method, path, data, queryParams) {
             contentType: "text",
             content: "This is the full content of the simulated email. Since we can't connect to the real Microsoft Graph API, we're returning this placeholder content instead."
           },
-          hasAttachments: false,
+          hasAttachments: true,
           importance: "normal",
           isRead: false,
           internetMessageHeaders: []
