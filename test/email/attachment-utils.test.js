@@ -27,6 +27,10 @@ describe('sanitizeFilename', () => {
     expect(sanitizeFilename('...')).toBe('attachment');
     expect(sanitizeFilename(undefined)).toBe('attachment');
   });
+
+  test('strips bidirectional override characters', () => {
+    expect(sanitizeFilename('report\u202Efdp.exe')).toBe('reportfdp.exe');
+  });
 });
 
 describe('resolveSavePath', () => {
@@ -75,6 +79,23 @@ describe('resolveSavePath', () => {
     fs.writeFileSync(target, 'x');
     expect(resolveSavePath(target, 'report.pdf')).toBe(path.join(tmpDir, 'renamed (1).pdf'));
   });
+
+  test('rejects a target outside home/temp directories', () => {
+    expect(() => resolveSavePath('/etc/passwd', 'report.pdf'))
+      .toThrow(/outside allowed locations/);
+  });
+
+  test('rejects a hidden file/folder under the home directory', () => {
+    const hidden = path.join(os.homedir(), '.ssh', 'authorized_keys');
+    expect(() => resolveSavePath(hidden, 'report.pdf'))
+      .toThrow(/outside allowed locations/);
+  });
+
+  test('rejects a hidden file/folder under a temp directory', () => {
+    const hidden = path.join(tmpDir, '.hidden', 'report.pdf');
+    expect(() => resolveSavePath(hidden, 'report.pdf'))
+      .toThrow(/outside allowed locations/);
+  });
 });
 
 describe('formatSize', () => {
@@ -117,5 +138,9 @@ describe('sanitizeDisplayName', () => {
 
   test('coerces non-string values to strings', () => {
     expect(sanitizeDisplayName(123)).toBe('123');
+  });
+
+  test('strips bidirectional override characters', () => {
+    expect(sanitizeDisplayName('evil\u202Ename')).toBe('evilname');
   });
 });

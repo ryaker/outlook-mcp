@@ -112,6 +112,47 @@ describe('handleDownloadAttachment', () => {
     expect(text.split('\n')).toHaveLength(3);
   });
 
+  test('rejects a savePath outside allowed locations without writing a file', async () => {
+    callGraphAPI.mockResolvedValue({
+      '@odata.type': '#microsoft.graph.fileAttachment',
+      id: 'att-5',
+      name: 'evil.pdf',
+      size: 4,
+      contentBytes: Buffer.from('evil').toString('base64')
+    });
+
+    const result = await handleDownloadAttachment({
+      emailId: 'email-1',
+      attachmentId: 'att-5',
+      savePath: '/etc/evil.pdf'
+    });
+
+    expect(result.content[0].text).toMatch(/error downloading attachment/i);
+    expect(result.content[0].text).toMatch(/outside allowed locations/i);
+    expect(fs.existsSync('/etc/evil.pdf')).toBe(false);
+  });
+
+  test('creates missing parent directories before writing', async () => {
+    const nestedPath = path.join(tmpDir, 'a', 'b', 'report.pdf');
+    callGraphAPI.mockResolvedValue({
+      '@odata.type': '#microsoft.graph.fileAttachment',
+      id: 'att-6',
+      name: 'report.pdf',
+      size: 11,
+      contentBytes: Buffer.from('PDF-CONTENT').toString('base64')
+    });
+
+    const result = await handleDownloadAttachment({
+      emailId: 'email-1',
+      attachmentId: 'att-6',
+      savePath: nestedPath
+    });
+
+    expect(fs.existsSync(nestedPath)).toBe(true);
+    expect(fs.readFileSync(nestedPath, 'utf8')).toBe('PDF-CONTENT');
+    expect(result.content[0].text).toContain(nestedPath);
+  });
+
   test('reports itemAttachment as unsupported', async () => {
     callGraphAPI.mockResolvedValue({
       '@odata.type': '#microsoft.graph.itemAttachment',

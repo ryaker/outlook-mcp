@@ -109,7 +109,7 @@ const emailTools = [
         },
         savePath: {
           type: "string",
-          description: "Where to save the file: an existing directory (attachment keeps its own name) or a full file path. Default: ~/Downloads"
+          description: "Where to save the file: an existing directory (attachment keeps its own name) or a full file path; parent folders are created if needed. Must be inside your home or temp directory and not target hidden files/folders. Default: ~/Downloads"
         }
       },
       required: ["emailId", "attachmentId"]

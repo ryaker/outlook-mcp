@@ -5,6 +5,7 @@
  * before writing to disk to prevent path traversal.
  */
 const fs = require('fs');
+const path = require('path');
 const { callGraphAPI } = require('../utils/graph-api');
 const { ensureAuthenticated } = require('../auth');
 const { sanitizeFilename, resolveSavePath, formatSize, sanitizeDisplayName } = require('./attachment-utils');
@@ -75,6 +76,7 @@ async function handleDownloadAttachment(args) {
     const filename = sanitizeFilename(attachment.name);
     const targetPath = resolveSavePath(savePath, filename);
     const buffer = Buffer.from(attachment.contentBytes, 'base64');
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
     fs.writeFileSync(targetPath, buffer);
 
     return {
