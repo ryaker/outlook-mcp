@@ -170,6 +170,12 @@ describe('handleDownloadAttachment', () => {
     expect(result.content[0].text).toMatch(/authenticate/i);
   });
 
+  test('handles UNAUTHORIZED rejection from the Graph API as an auth failure', async () => {
+    callGraphAPI.mockRejectedValue(new Error('UNAUTHORIZED'));
+    const result = await handleDownloadAttachment({ emailId: 'e', attachmentId: 'a' });
+    expect(result.content[0].text).toMatch(/authenticate/i);
+  });
+
   test('handles Graph API errors', async () => {
     callGraphAPI.mockRejectedValue(new Error('Graph API error (404)'));
     const result = await handleDownloadAttachment({ emailId: 'e', attachmentId: 'a' });

@@ -9,7 +9,8 @@ const path = require('path');
  * Sanitize an attachment filename so it cannot escape the target directory.
  * Strips bidirectional-override/isolate characters (used to visually spoof
  * file extensions, e.g. an RLO character making "evil.exe" display as
- * "evil.pdf"), null bytes, converts path separators to underscores, removes
+ * "evil.pdf"), all C0 control characters (0x00-0x1F) and DEL (0x7F),
+ * converts path separators to underscores, removes
  * leading dots. Falls back to 'attachment' for degenerate names.
  * @param {string} name - Untrusted filename from the attachment
  * @returns {string} - Safe filename
@@ -20,7 +21,7 @@ function sanitizeFilename(name) {
   }
   let safe = name
     .replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '')
-    .replace(/\u0000/g, '')
+    .replace(/[\u0000-\u001F\u007F]/g, '')
     .replace(/^[/\\]+/, '')
     .replace(/\.\.[/\\]/g, '')
     .replace(/[/\\]/g, '_')
@@ -144,7 +145,7 @@ function sanitizeDisplayName(value) {
  * Format a byte count as a human-readable string.
  */
 function formatSize(bytes) {
-  if (!bytes || bytes === 0) return '0 B';
+  if (!bytes || bytes <= 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));

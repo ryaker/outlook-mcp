@@ -116,11 +116,11 @@ ${body}`;
             null,
             { $select: 'id,name,size,contentType,isInline' }
           );
-          const attachments = (attachResponse && attachResponse.value) || [];
+          const attachments = (attachResponse && Array.isArray(attachResponse.value)) ? attachResponse.value : [];
           if (attachments.length > 0) {
             const lines = attachments.map((a, i) => {
               const inline = a.isInline ? ', inline' : '';
-              const name = sanitizeDisplayName(a.name);
+              const name = sanitizeDisplayName(a.name) || 'unnamed attachment';
               const contentType = sanitizeDisplayName(a.contentType) || 'unknown type';
               return `${i + 1}. ${name} (${formatSize(a.size)}${inline}) — ${contentType} [id: ${a.id}]`;
             });

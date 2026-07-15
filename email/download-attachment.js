@@ -86,7 +86,7 @@ async function handleDownloadAttachment(args) {
       }]
     };
   } catch (error) {
-    if (error.message === 'Authentication required') {
+    if (error.message === 'Authentication required' || error.message === 'UNAUTHORIZED') {
       return {
         content: [{
           type: "text",

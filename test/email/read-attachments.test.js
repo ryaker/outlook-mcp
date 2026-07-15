@@ -85,6 +85,34 @@ describe('read-email attachment listing', () => {
     expect(result.content[0].text).not.toContain('Attachments (');
   });
 
+  test('handles a non-array attachments value without throwing', async () => {
+    callGraphAPI
+      .mockResolvedValueOnce(baseEmail)
+      .mockResolvedValueOnce({ value: {} });
+
+    const result = await handleReadEmail({ id: 'email-1' });
+    const text = result.content[0].text;
+
+    expect(text).toContain('Subject: Test');
+    expect(text).not.toContain('Attachments (');
+    expect(text).not.toContain('Could not list attachments');
+  });
+
+  test('falls back to "unnamed attachment" when the name is only control characters', async () => {
+    callGraphAPI
+      .mockResolvedValueOnce(baseEmail)
+      .mockResolvedValueOnce({
+        value: [
+          { id: 'att-1', name: '\u0001\u0002\u0003', size: 10, contentType: 'application/pdf', isInline: false }
+        ]
+      });
+
+    const result = await handleReadEmail({ id: 'email-1' });
+    const text = result.content[0].text;
+
+    expect(text).toContain('1. unnamed attachment (10 B) — application/pdf [id: att-1]');
+  });
+
   test('email still returned when attachment listing fails', async () => {
     callGraphAPI
       .mockResolvedValueOnce(baseEmail)

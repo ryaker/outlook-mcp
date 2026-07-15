@@ -31,6 +31,11 @@ describe('sanitizeFilename', () => {
   test('strips bidirectional override characters', () => {
     expect(sanitizeFilename('report\u202Efdp.exe')).toBe('reportfdp.exe');
   });
+
+  test('strips all C0 control characters and DEL', () => {
+    expect(sanitizeFilename('evil\nname\r.pdf')).toBe('evilname.pdf');
+    expect(sanitizeFilename('a\tb\u001bc\u007fd.txt')).toBe('abcd.txt');
+  });
 });
 
 describe('resolveSavePath', () => {
@@ -104,6 +109,10 @@ describe('formatSize', () => {
     expect(formatSize(500)).toBe('500 B');
     expect(formatSize(251392)).toBe('245.5 KB');
     expect(formatSize(1048576)).toBe('1 MB');
+  });
+
+  test('treats negative sizes as 0 B', () => {
+    expect(formatSize(-5)).toBe('0 B');
   });
 });
 
