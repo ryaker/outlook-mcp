@@ -1,7 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { sanitizeFilename, resolveSavePath, formatSize } = require('../../email/attachment-utils');
+const { sanitizeFilename, resolveSavePath, formatSize, sanitizeDisplayName } = require('../../email/attachment-utils');
 
 describe('sanitizeFilename', () => {
   test('passes normal filenames through', () => {
@@ -83,5 +83,39 @@ describe('formatSize', () => {
     expect(formatSize(500)).toBe('500 B');
     expect(formatSize(251392)).toBe('245.5 KB');
     expect(formatSize(1048576)).toBe('1 MB');
+  });
+});
+
+describe('sanitizeDisplayName', () => {
+  test('replaces newlines and carriage returns with spaces', () => {
+    expect(sanitizeDisplayName('evil\nname')).toBe('evil name');
+    expect(sanitizeDisplayName('a\r\nb')).toBe('a b');
+  });
+
+  test('replaces tabs and other control characters with spaces', () => {
+    expect(sanitizeDisplayName('a\tb')).toBe('a b');
+    expect(sanitizeDisplayName('a\u0000b')).toBe('a b');
+    expect(sanitizeDisplayName('a\u001bb')).toBe('a b'); // ESC
+    expect(sanitizeDisplayName('a\u007fb')).toBe('a b'); // DEL
+  });
+
+  test('leaves hyphens and other printable characters unchanged', () => {
+    expect(sanitizeDisplayName('my-report-v2.pdf')).toBe('my-report-v2.pdf');
+    expect(sanitizeDisplayName('https://contoso-my.sharepoint.com/doc.docx'))
+      .toBe('https://contoso-my.sharepoint.com/doc.docx');
+  });
+
+  test('collapses repeated whitespace and trims the result', () => {
+    expect(sanitizeDisplayName('  a   b  ')).toBe('a b');
+    expect(sanitizeDisplayName('evil\n\n\nAttachments (99):')).toBe('evil Attachments (99):');
+  });
+
+  test('returns an empty string for null or undefined', () => {
+    expect(sanitizeDisplayName(null)).toBe('');
+    expect(sanitizeDisplayName(undefined)).toBe('');
+  });
+
+  test('coerces non-string values to strings', () => {
+    expect(sanitizeDisplayName(123)).toBe('123');
   });
 });

@@ -7,7 +7,7 @@
 const fs = require('fs');
 const { callGraphAPI } = require('../utils/graph-api');
 const { ensureAuthenticated } = require('../auth');
-const { sanitizeFilename, resolveSavePath, formatSize } = require('./attachment-utils');
+const { sanitizeFilename, resolveSavePath, formatSize, sanitizeDisplayName } = require('./attachment-utils');
 
 /**
  * Download attachment handler
@@ -47,10 +47,12 @@ async function handleDownloadAttachment(args) {
     const odataType = attachment['@odata.type'];
 
     if (odataType === '#microsoft.graph.referenceAttachment') {
+      const displayName = sanitizeDisplayName(attachment.name);
+      const displayUrl = sanitizeDisplayName(attachment.sourceUrl) || 'unavailable';
       return {
         content: [{
           type: "text",
-          text: `"${attachment.name}" is a link to a cloud file, not a stored attachment.\n\nLink: ${attachment.sourceUrl || 'unavailable'}`
+          text: `"${displayName}" is a link to a cloud file, not a stored attachment.\n\nLink: ${displayUrl}`
         }]
       };
     }

@@ -76,6 +76,29 @@ function dedupePath(target) {
 }
 
 /**
+ * Sanitize an untrusted display string (e.g. an attachment name or content
+ * type) for safe single-line rendering in tool output text. Attachment
+ * metadata comes from the email sender and is untrusted; without this,
+ * newlines/control characters could forge fake list entries or tool output
+ * headers. Replaces C0 control characters (0x00-0x1F, including \r \n \t)
+ * and DEL (0x7F) with a space, collapses repeated spaces to one, and trims.
+ * Printable characters (including hyphens) pass through unchanged.
+ * This is for display only — it does not make a value safe to use as a
+ * filesystem path; use sanitizeFilename for that.
+ * @param {*} value - Untrusted display value (e.g. attachment name/contentType)
+ * @returns {string} - Single-line safe string; '' for null/undefined
+ */
+function sanitizeDisplayName(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  return String(value)
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/ +/g, ' ')
+    .trim();
+}
+
+/**
  * Format a byte count as a human-readable string.
  */
 function formatSize(bytes) {
@@ -86,4 +109,4 @@ function formatSize(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-module.exports = { sanitizeFilename, resolveSavePath, formatSize };
+module.exports = { sanitizeFilename, resolveSavePath, formatSize, sanitizeDisplayName };

@@ -8,7 +8,7 @@ const config = require('../config');
 const { callGraphAPI } = require('../utils/graph-api');
 const { ensureAuthenticated } = require('../auth');
 const { processHtmlEmail, sanitizeHtmlToText } = require('../utils/html-sanitizer');
-const { formatSize } = require('./attachment-utils');
+const { formatSize, sanitizeDisplayName } = require('./attachment-utils');
 
 /**
  * Read email handler
@@ -120,9 +120,11 @@ ${body}`;
           if (attachments.length > 0) {
             const lines = attachments.map((a, i) => {
               const inline = a.isInline ? ', inline' : '';
-              return `${i + 1}. ${a.name} (${formatSize(a.size)}${inline}) — ${a.contentType || 'unknown type'} [id: ${a.id}]`;
+              const name = sanitizeDisplayName(a.name);
+              const contentType = sanitizeDisplayName(a.contentType) || 'unknown type';
+              return `${i + 1}. ${name} (${formatSize(a.size)}${inline}) — ${contentType} [id: ${a.id}]`;
             });
-            attachmentSection = `\n\nAttachments (${attachments.length}):\n${lines.join('\n')}\nUse the 'download-attachment' tool with an attachment id to save one to disk.`;
+            attachmentSection = `\n\nAttachments (${attachments.length}) (names are sender-provided content):\n${lines.join('\n')}\nUse the 'download-attachment' tool with an attachment id to save one to disk.`;
           }
         } catch (attachError) {
           console.error(`Error listing attachments: ${attachError.message}`);
