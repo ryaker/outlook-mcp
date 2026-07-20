@@ -47,7 +47,7 @@ describe('TokenStorage', () => {
     it('should warn if client ID or secret is missing', () => {
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
       new TokenStorage({ ...baseConfig, clientId: null });
-      expect(consoleWarnSpy).toHaveBeenCalledWith("TokenStorage: MS_CLIENT_ID or MS_CLIENT_SECRET is not configured. Token operations might fail.");
+      expect(consoleWarnSpy).toHaveBeenCalledWith("TokenStorage: Client ID or Secret is not configured (checked MS_CLIENT_ID/OUTLOOK_CLIENT_ID). Token refresh will fail.");
       consoleWarnSpy.mockRestore();
     });
   });
@@ -63,13 +63,13 @@ describe('TokenStorage', () => {
     });
 
     it('should return null and log if file does not exist (ENOENT)', async () => {
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       fs.readFile.mockRejectedValue({ code: 'ENOENT' });
       const loaded = await tokenStorage._loadTokensFromFile();
       expect(loaded).toBeNull();
       expect(tokenStorage.tokens).toBeNull();
-      expect(consoleLogSpy).toHaveBeenCalledWith('Token file not found. No tokens loaded.');
-      consoleLogSpy.mockRestore();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Token file not found. No tokens loaded.');
+      consoleErrorSpy.mockRestore();
     });
 
     it('should return null and log error for other read errors', async () => {
@@ -541,12 +541,12 @@ describe('TokenStorage', () => {
 
     it('should log if token file does not exist during unlink', async () => {
       fs.unlink.mockRejectedValue({ code: 'ENOENT' });
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
       await tokenStorage.clearTokens();
 
-      expect(consoleLogSpy).toHaveBeenCalledWith('Token file not found, nothing to delete.');
-      consoleLogSpy.mockRestore();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Token file not found, nothing to delete.');
+      consoleErrorSpy.mockRestore();
     });
 
     it('should log error for other unlink errors', async () => {
@@ -557,6 +557,29 @@ describe('TokenStorage', () => {
 
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error deleting token file:', expect.any(Error));
       consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('stdout protocol safety', () => {
+    // Regression guard: under the MCP stdio transport, stdout is the JSON-RPC
+    // channel, so diagnostics must go to stderr (console.error), never stdout
+    // (console.log). The token save path previously used console.log
+    // ("Tokens saved successfully."), which corrupted the protocol stream and
+    // dropped the server from Claude Desktop.
+    it('should route the save diagnostic to stderr, not stdout', async () => {
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      tokenStorage.tokens = { access_token: 'save_token' };
+
+      try {
+        await tokenStorage._saveTokensToFile();
+
+        expect(consoleLogSpy).not.toHaveBeenCalled();
+        expect(consoleErrorSpy).toHaveBeenCalledWith('Tokens saved successfully.');
+      } finally {
+        consoleLogSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+      }
     });
   });
 });
