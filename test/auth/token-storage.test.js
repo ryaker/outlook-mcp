@@ -571,12 +571,15 @@ describe('TokenStorage', () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       tokenStorage.tokens = { access_token: 'save_token' };
 
-      await tokenStorage._saveTokensToFile();
+      try {
+        await tokenStorage._saveTokensToFile();
 
-      expect(consoleLogSpy).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Tokens saved successfully.');
-      consoleLogSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
+        expect(consoleLogSpy).not.toHaveBeenCalled();
+        expect(consoleErrorSpy).toHaveBeenCalledWith('Tokens saved successfully.');
+      } finally {
+        consoleLogSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+      }
     });
   });
 });
