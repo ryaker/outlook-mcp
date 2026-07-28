@@ -3,6 +3,7 @@
  */
 const config = require('../config');
 const tokenManager = require('./token-manager');
+const TokenStorage = require('./token-storage');
 
 /**
  * About tool handler
@@ -55,22 +56,18 @@ async function handleAuthenticate(args) {
  */
 async function handleCheckAuthStatus() {
   console.error('[CHECK-AUTH-STATUS] Starting authentication status check');
-  
-  const tokens = tokenManager.loadTokenCache();
-  
-  console.error(`[CHECK-AUTH-STATUS] Tokens loaded: ${tokens ? 'YES' : 'NO'}`);
-  
-  if (!tokens || !tokens.access_token) {
-    console.error('[CHECK-AUTH-STATUS] No valid access token found');
+
+  const tokenStorage = new TokenStorage();
+  const accessToken = await tokenStorage.getValidAccessToken();
+
+  console.error(`[CHECK-AUTH-STATUS] Valid access token: ${accessToken ? 'YES' : 'NO'}`);
+
+  if (!accessToken) {
     return {
       content: [{ type: "text", text: "Not authenticated" }]
     };
   }
-  
-  console.error('[CHECK-AUTH-STATUS] Access token present');
-  console.error(`[CHECK-AUTH-STATUS] Token expires at: ${tokens.expires_at}`);
-  console.error(`[CHECK-AUTH-STATUS] Current time: ${Date.now()}`);
-  
+
   return {
     content: [{ type: "text", text: "Authenticated and ready" }]
   };

@@ -2,6 +2,7 @@ const fs = require('fs').promises;
 const https = require('https');
 const path = require('path');
 const querystring = require('querystring');
+const config = require('../../config');
 const TokenStorage = require('../../auth/token-storage');
 
 jest.mock('fs', () => ({
@@ -48,6 +49,45 @@ describe('TokenStorage', () => {
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
       new TokenStorage({ ...baseConfig, clientId: null });
       expect(consoleWarnSpy).toHaveBeenCalledWith("TokenStorage: MS_CLIENT_ID or MS_CLIENT_SECRET is not configured. Token operations might fail.");
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should use config.js scopes as default when no MS_SCOPES env var is set', () => {
+      delete process.env.MS_SCOPES;
+      const storage = new TokenStorage({
+        clientId: 'test-client-id',
+        clientSecret: 'test-client-secret',
+        redirectUri: 'http://localhost/callback',
+        tokenEndpoint: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+      });
+      expect(storage.config.scopes).toEqual(config.AUTH_CONFIG.scopes);
+    });
+
+    it('should use MS_SCOPES env var override when set', () => {
+      process.env.MS_SCOPES = 'offline_access User.Read Mail.Read';
+      const storage = new TokenStorage({
+        clientId: 'test-client-id',
+        clientSecret: 'test-client-secret',
+        redirectUri: 'http://localhost/callback',
+        tokenEndpoint: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+      });
+      expect(storage.config.scopes).toEqual(['offline_access', 'User.Read', 'Mail.Read']);
+      delete process.env.MS_SCOPES;
+    });
+
+    it('should warn if MS_SCOPES override is missing offline_access', () => {
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      process.env.MS_SCOPES = 'User.Read Mail.Read';
+      new TokenStorage({
+        clientId: 'test-client-id',
+        clientSecret: 'test-client-secret',
+        redirectUri: 'http://localhost/callback',
+        tokenEndpoint: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+      });
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('offline_access')
+      );
+      delete process.env.MS_SCOPES;
       consoleWarnSpy.mockRestore();
     });
   });
@@ -233,6 +273,7 @@ describe('TokenStorage', () => {
       expect(requestBody.grant_type).toBe('authorization_code');
       expect(requestBody.code).toBe(mockAuthCode);
       expect(requestBody.client_id).toBe(baseConfig.clientId);
+      expect(requestBody.scope).toBe(baseConfig.scopes.join(' '));
 
       expect(tokens.access_token).toBe('new_access_token');
       expect(tokenStorage.tokens.access_token).toBe('new_access_token');
@@ -343,6 +384,7 @@ describe('TokenStorage', () => {
         const requestBody = querystring.parse(mockHttpsRequest.write.mock.calls[0][0]);
         expect(requestBody.grant_type).toBe('refresh_token');
         expect(requestBody.refresh_token).toBe('valid_refresh_token');
+        expect(requestBody.scope).toBe(baseConfig.scopes.join(' '));
     });
 
     it('should reject if saving refreshed token fails', async () => {

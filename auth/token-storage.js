@@ -2,6 +2,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const https = require('https');
 const querystring = require('querystring');
+const appConfig = require('../config');
 
 class TokenStorage {
   constructor(config) {
@@ -17,7 +18,7 @@ class TokenStorage {
       clientId,
       clientSecret,
       redirectUri: process.env.MS_REDIRECT_URI || 'http://localhost:3333/auth/callback',
-      scopes: (process.env.MS_SCOPES || 'offline_access User.Read Mail.Read').split(' '),
+      scopes: (process.env.MS_SCOPES || appConfig.AUTH_CONFIG.scopes.join(' ')).split(' '),
       tenantId,
       tokenEndpoint: process.env.MS_TOKEN_ENDPOINT || `${authorityHost}/${tenantId}/oauth2/v2.0/token`,
       refreshTokenBuffer: 5 * 60 * 1000, // 5 minutes buffer for token refresh
@@ -29,6 +30,10 @@ class TokenStorage {
 
     if (!this.config.clientId || !this.config.clientSecret) {
       console.warn("TokenStorage: Client ID or Secret is not configured (checked MS_CLIENT_ID/OUTLOOK_CLIENT_ID). Token refresh will fail.");
+    }
+
+    if (process.env.MS_SCOPES && !this.config.scopes.includes('offline_access')) {
+      console.warn('MS_SCOPES override is missing offline_access — refresh tokens will not be issued.');
     }
   }
 
