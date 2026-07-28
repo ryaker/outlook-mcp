@@ -37,22 +37,16 @@ setInterval(() => {
 }, 5 * 60 * 1000).unref(); // unref so the timer doesn't prevent process exit
 
 // Authentication configuration
+const config = require('./config');
+
 const AUTH_CONFIG = {
   clientId: process.env.MS_CLIENT_ID || '', // Set your client ID as an environment variable
   clientSecret: process.env.MS_CLIENT_SECRET || '', // Set your client secret as an environment variable
   tenantId: process.env.MS_TENANT_ID || 'common',
   authorityHost: (process.env.MS_AUTHORITY_HOST || 'https://login.microsoftonline.com').replace(/\/+$/, ''),
-  redirectUri: 'http://localhost:3333/auth/callback',
-  scopes: [
-    'offline_access',
-    'User.Read',
-    'Mail.Read',
-    'Mail.Send',
-    'Calendars.Read',
-    'Calendars.ReadWrite',
-    'Contacts.Read'
-  ],
-  tokenStorePath: path.join(process.env.HOME || process.env.USERPROFILE, '.outlook-mcp-tokens.json')
+  redirectUri: config.AUTH_CONFIG.redirectUri,
+  scopes: config.AUTH_CONFIG.scopes,
+  tokenStorePath: config.AUTH_CONFIG.tokenStorePath
 };
 
 // Create HTTP server
