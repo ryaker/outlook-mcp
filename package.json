@@ -31,7 +31,7 @@
     "dotenv": "^16.5.0"
   },
   "devDependencies": {
-    "@modelcontextprotocol/inspector": "^0.10.2",
+    "@modelcontextprotocol/inspector": "^0.22.0",
     "jest": "^29.7.0",
     "supertest": "^7.0.0"
   },
