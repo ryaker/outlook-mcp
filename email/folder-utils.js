@@ -60,52 +60,72 @@ async function resolveFolderPath(accessToken, folderName) {
 }
 
 /**
- * Get the ID of a mail folder by its name
+ * Resolve a single folder segment within a parent folder
  * @param {string} accessToken - Access token
- * @param {string} folderName - Name of the folder to find
+ * @param {string|null} parentId - Parent folder ID, or null for top-level
+ * @param {string} segment - Folder segment name to resolve
+ * @returns {Promise<string|null>} - Folder ID or null if not found
+ */
+async function resolveSegmentInParent(accessToken, parentId, segment) {
+  const base = parentId ? `me/mailFolders/${parentId}/childFolders` : 'me/mailFolders';
+
+  // First try with exact match filter
+  const response = await callGraphAPI(
+    accessToken,
+    'GET',
+    base,
+    null,
+    { $filter: `displayName eq '${segment}'` }
+  );
+
+  if (response.value && response.value.length > 0) {
+    return response.value[0].id;
+  }
+
+  // If exact match fails, try to get all folders and do a case-insensitive comparison
+  const allFoldersResponse = await callGraphAPI(
+    accessToken,
+    'GET',
+    base,
+    null,
+    { $top: 100 }
+  );
+
+  if (allFoldersResponse.value) {
+    const lowerSegment = segment.toLowerCase();
+    const matchingFolder = allFoldersResponse.value.find(
+      folder => folder.displayName.toLowerCase() === lowerSegment
+    );
+
+    if (matchingFolder) {
+      return matchingFolder.id;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Get the ID of a mail folder by its name or path
+ * @param {string} accessToken - Access token
+ * @param {string} folderName - Name or path (e.g. "Tramite/REQ-104951") of the folder to find
  * @returns {Promise<string|null>} - Folder ID or null if not found
  */
 async function getFolderIdByName(accessToken, folderName) {
+  const segments = folderName.split('/').map(s => s.trim()).filter(Boolean);
+  if (segments.length === 0) {
+    return null;
+  }
+
   try {
-    // First try with exact match filter
-    console.error(`Looking for folder with name "${folderName}"`);
-    const response = await callGraphAPI(
-      accessToken,
-      'GET',
-      'me/mailFolders',
-      null,
-      { $filter: `displayName eq '${folderName}'` }
-    );
-    
-    if (response.value && response.value.length > 0) {
-      console.error(`Found folder "${folderName}" with ID: ${response.value[0].id}`);
-      return response.value[0].id;
-    }
-    
-    // If exact match fails, try to get all folders and do a case-insensitive comparison
-    console.error(`No exact match found for "${folderName}", trying case-insensitive search`);
-    const allFoldersResponse = await callGraphAPI(
-      accessToken,
-      'GET',
-      'me/mailFolders',
-      null,
-      { $top: 100 }
-    );
-    
-    if (allFoldersResponse.value) {
-      const lowerFolderName = folderName.toLowerCase();
-      const matchingFolder = allFoldersResponse.value.find(
-        folder => folder.displayName.toLowerCase() === lowerFolderName
-      );
-      
-      if (matchingFolder) {
-        console.error(`Found case-insensitive match for "${folderName}" with ID: ${matchingFolder.id}`);
-        return matchingFolder.id;
+    let currentId = null;
+    for (const segment of segments) {
+      currentId = await resolveSegmentInParent(accessToken, currentId, segment);
+      if (currentId === null) {
+        return null;
       }
     }
-    
-    console.error(`No folder found matching "${folderName}"`);
-    return null;
+    return currentId;
   } catch (error) {
     console.error(`Error finding folder "${folderName}": ${error.message}`);
     return null;
@@ -170,6 +190,7 @@ async function getAllFolders(accessToken) {
 module.exports = {
   WELL_KNOWN_FOLDERS,
   resolveFolderPath,
+  resolveSegmentInParent,
   getFolderIdByName,
   getAllFolders
 };

@@ -1,0 +1,52 @@
+# openspec/config.yaml
+schema: spec-driven
+
+context: |
+  Tech stack: Node.js (CommonJS), Microsoft Graph API MCP server
+  Architecture: Modular MCP server with auth/, calendar/, email/, folder/, onedrive/, power-automate/, utils/ modules
+  Testing: Jest 29.7, supertest 7.0, test/ directory (auth, calendar, email, utils, sse-server)
+  Style: CommonJS modules, no lint/formatter config detected
+  VCS: Git (GitHub, fork of ryaker/outlook-mcp)
+
+strict_tdd: true
+test_command: npm test
+
+testing:
+  runner: Jest 29.7.0
+  test_command: npm test
+  layers:
+    unit: true
+    integration: true
+    e2e: false
+  coverage:
+    available: true
+    command: npx jest --coverage
+  quality:
+    linter: false
+    type_checker: false
+    formatter: false
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Scope each change to a single concern
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    guidelines:
+      - Follow existing code patterns (CommonJS, modular structure)
+    tdd: true
+    test_command: npm test
+  verify:
+    test_command: npm test
+    build_command: ""
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas

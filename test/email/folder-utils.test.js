@@ -1,7 +1,8 @@
 const {
   WELL_KNOWN_FOLDERS,
   resolveFolderPath,
-  getFolderIdByName
+  getFolderIdByName,
+  resolveSegmentInParent
 } = require('../../email/folder-utils');
 const { callGraphAPI } = require('../../utils/graph-api');
 
@@ -212,5 +213,189 @@ describe('getFolderIdByName', () => {
 
     expect(result).toBeNull();
     expect(callGraphAPI).toHaveBeenCalledTimes(1);
+  });
+
+  describe('getFolderIdByName - path resolution', () => {
+    beforeEach(() => {
+      callGraphAPI.mockReset();
+    });
+
+    test('two-level path resolves to subfolder ID', async () => {
+      callGraphAPI
+        .mockResolvedValueOnce({ value: [{ id: 'tramite-id', displayName: 'Tramite' }] })
+        .mockResolvedValueOnce({ value: [{ id: 'req-104951-id', displayName: 'REQ-104951' }] });
+
+      const result = await getFolderIdByName(mockAccessToken, 'Tramite/REQ-104951');
+
+      expect(result).toBe('req-104951-id');
+      expect(callGraphAPI).toHaveBeenCalledTimes(2);
+      expect(callGraphAPI).toHaveBeenNthCalledWith(
+        1,
+        mockAccessToken,
+        'GET',
+        'me/mailFolders',
+        null,
+        { $filter: "displayName eq 'Tramite'" }
+      );
+      expect(callGraphAPI).toHaveBeenNthCalledWith(
+        2,
+        mockAccessToken,
+        'GET',
+        'me/mailFolders/tramite-id/childFolders',
+        null,
+        { $filter: "displayName eq 'REQ-104951'" }
+      );
+    });
+
+    test('three-level path resolves to nested subfolder ID', async () => {
+      callGraphAPI
+        .mockResolvedValueOnce({ value: [{ id: 'a-id', displayName: 'A' }] })
+        .mockResolvedValueOnce({ value: [{ id: 'b-id', displayName: 'B' }] })
+        .mockResolvedValueOnce({ value: [{ id: 'c-id', displayName: 'C' }] });
+
+      const result = await getFolderIdByName(mockAccessToken, 'A/B/C');
+
+      expect(result).toBe('c-id');
+      expect(callGraphAPI).toHaveBeenCalledTimes(3);
+      expect(callGraphAPI).toHaveBeenNthCalledWith(
+        3,
+        mockAccessToken,
+        'GET',
+        'me/mailFolders/b-id/childFolders',
+        null,
+        { $filter: "displayName eq 'C'" }
+      );
+    });
+
+    test('flat folder name uses single top-level API call', async () => {
+      callGraphAPI.mockResolvedValueOnce({ value: [{ id: 'inbox-id', displayName: 'Inbox' }] });
+
+      const result = await getFolderIdByName(mockAccessToken, 'Inbox');
+
+      expect(result).toBe('inbox-id');
+      expect(callGraphAPI).toHaveBeenCalledTimes(1);
+      expect(callGraphAPI).toHaveBeenCalledWith(
+        mockAccessToken,
+        'GET',
+        'me/mailFolders',
+        null,
+        { $filter: "displayName eq 'Inbox'" }
+      );
+    });
+
+    test('case-insensitive segments resolve via fallback', async () => {
+      callGraphAPI
+        .mockResolvedValueOnce({ value: [] })
+        .mockResolvedValueOnce({ value: [{ id: 'tramite-id', displayName: 'TRAMITE' }] })
+        .mockResolvedValueOnce({ value: [] })
+        .mockResolvedValueOnce({ value: [{ id: 'req-104951-id', displayName: 'req-104951' }] });
+
+      const result = await getFolderIdByName(mockAccessToken, 'tramite/req-104951');
+
+      expect(result).toBe('req-104951-id');
+      expect(callGraphAPI).toHaveBeenCalledTimes(4);
+      expect(callGraphAPI).toHaveBeenNthCalledWith(
+        2,
+        mockAccessToken,
+        'GET',
+        'me/mailFolders',
+        null,
+        { $top: 100 }
+      );
+      expect(callGraphAPI).toHaveBeenNthCalledWith(
+        4,
+        mockAccessToken,
+        'GET',
+        'me/mailFolders/tramite-id/childFolders',
+        null,
+        { $top: 100 }
+      );
+    });
+
+    test('non-existent segment returns null and short-circuits', async () => {
+      callGraphAPI
+        .mockResolvedValueOnce({ value: [{ id: 'tramite-id', displayName: 'Tramite' }] })
+        .mockResolvedValueOnce({ value: [] })
+        .mockResolvedValueOnce({ value: [{ id: 'other-id', displayName: 'OtherFolder' }] });
+
+      const result = await getFolderIdByName(mockAccessToken, 'Tramite/NONEXISTENT/Child');
+
+      expect(result).toBeNull();
+      expect(callGraphAPI).toHaveBeenCalledTimes(3);
+    });
+
+    test('non-existent top-level folder returns null with no child queries', async () => {
+      callGraphAPI
+        .mockResolvedValueOnce({ value: [] })
+        .mockResolvedValueOnce({ value: [{ id: 'other-id', displayName: 'OtherFolder' }] });
+
+      const result = await getFolderIdByName(mockAccessToken, 'NonExistent/Child');
+
+      expect(result).toBeNull();
+      expect(callGraphAPI).toHaveBeenCalledTimes(2);
+    });
+
+    test('empty segments are filtered and path still resolves', async () => {
+      callGraphAPI
+        .mockResolvedValueOnce({ value: [{ id: 'tramite-id', displayName: 'Tramite' }] })
+        .mockResolvedValueOnce({ value: [{ id: 'req-104951-id', displayName: 'REQ-104951' }] });
+
+      const result = await getFolderIdByName(mockAccessToken, 'Tramite//REQ-104951');
+
+      expect(result).toBe('req-104951-id');
+      expect(callGraphAPI).toHaveBeenCalledTimes(2);
+    });
+
+    test('all-empty path returns null without API calls', async () => {
+      const result1 = await getFolderIdByName(mockAccessToken, '/');
+      const result2 = await getFolderIdByName(mockAccessToken, '//');
+
+      expect(result1).toBeNull();
+      expect(result2).toBeNull();
+      expect(callGraphAPI).not.toHaveBeenCalled();
+    });
+
+    test('API error mid-traversal returns null', async () => {
+      callGraphAPI
+        .mockResolvedValueOnce({ value: [{ id: 'a-id', displayName: 'A' }] })
+        .mockRejectedValueOnce(new Error('API Error'));
+
+      const result = await getFolderIdByName(mockAccessToken, 'A/B');
+
+      expect(result).toBeNull();
+      expect(callGraphAPI).toHaveBeenCalledTimes(2);
+    });
+
+    test('resolveSegmentInParent exact match at top-level', async () => {
+      callGraphAPI.mockResolvedValueOnce({ value: [{ id: 'top-id', displayName: 'TopFolder' }] });
+
+      const result = await resolveSegmentInParent(mockAccessToken, null, 'TopFolder');
+
+      expect(result).toBe('top-id');
+      expect(callGraphAPI).toHaveBeenCalledWith(
+        mockAccessToken,
+        'GET',
+        'me/mailFolders',
+        null,
+        { $filter: "displayName eq 'TopFolder'" }
+      );
+    });
+
+    test('resolveSegmentInParent case-insensitive fallback at child level', async () => {
+      callGraphAPI
+        .mockResolvedValueOnce({ value: [] })
+        .mockResolvedValueOnce({ value: [{ id: 'child-id', displayName: 'childname' }] });
+
+      const result = await resolveSegmentInParent(mockAccessToken, 'parent-id', 'CHILDNAME');
+
+      expect(result).toBe('child-id');
+      expect(callGraphAPI).toHaveBeenCalledWith(
+        mockAccessToken,
+        'GET',
+        'me/mailFolders/parent-id/childFolders',
+        null,
+        { $top: 100 }
+      );
+    });
   });
 });

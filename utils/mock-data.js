@@ -120,13 +120,28 @@ function simulateGraphAPIResponse(method, path, data, queryParams) {
         };
       }
     } else if (path.includes('mailFolders')) {
+      // Child folder lookup support for path-style folder references
+      const CHILD_FOLDERS = {
+        "inbox": [
+          { id: "inbox-child", displayName: "InboxChild" }
+        ]
+      };
+
+      if (path.includes('childFolders')) {
+        const parentId = path.split('/').find((segment, index, parts) => {
+          return parts[index - 1] === 'mailFolders' && parts[index + 1] === 'childFolders';
+        });
+        return { value: CHILD_FOLDERS[parentId] || [] };
+      }
+
       // Simulate a mail folders response
       return {
         value: [
           { id: "inbox", displayName: "Inbox" },
           { id: "drafts", displayName: "Drafts" },
           { id: "sentItems", displayName: "Sent Items" },
-          { id: "deleteditems", displayName: "Deleted Items" }
+          { id: "deleteditems", displayName: "Deleted Items" },
+          { id: "tramite", displayName: "Tramite" }
         ]
       };
     }

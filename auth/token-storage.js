@@ -28,7 +28,7 @@ class TokenStorage {
     this._refreshPromise = null;
 
     if (!this.config.clientId || !this.config.clientSecret) {
-      console.warn("TokenStorage: Client ID or Secret is not configured (checked MS_CLIENT_ID/OUTLOOK_CLIENT_ID). Token refresh will fail.");
+      console.warn("TokenStorage: MS_CLIENT_ID or MS_CLIENT_SECRET is not configured. Token operations might fail.");
     }
   }
 
