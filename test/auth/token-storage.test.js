@@ -570,6 +570,138 @@ describe('TokenStorage', () => {
     });
   });
 
+  describe('isFlowTokenExpired', () => {
+    it('should return true when no flow token or expiry is set', () => {
+      tokenStorage.tokens = null;
+      expect(tokenStorage.isFlowTokenExpired()).toBe(true);
+      tokenStorage.tokens = { access_token: 'graph_token' };
+      expect(tokenStorage.isFlowTokenExpired()).toBe(true);
+    });
+
+    it('should return false when flow token expiry is beyond buffer', () => {
+      tokenStorage.tokens = {
+        flow_access_token: 'flow_token',
+        flow_expires_at: Date.now() + tokenStorage.config.refreshTokenBuffer + 60000,
+      };
+      expect(tokenStorage.isFlowTokenExpired()).toBe(false);
+    });
+
+    it('should return true when flow token is within buffer or past expiry', () => {
+      tokenStorage.tokens = {
+        flow_access_token: 'flow_token',
+        flow_expires_at: Date.now() + tokenStorage.config.refreshTokenBuffer - 1000,
+      };
+      expect(tokenStorage.isFlowTokenExpired()).toBe(true);
+
+      tokenStorage.tokens = {
+        flow_access_token: 'flow_token',
+        flow_expires_at: Date.now() - 60000,
+      };
+      expect(tokenStorage.isFlowTokenExpired()).toBe(true);
+    });
+  });
+
+  describe('getFlowAccessToken', () => {
+    it('should return the flow access token when valid', async () => {
+      tokenStorage.tokens = {
+        flow_access_token: 'flow-token-123',
+        flow_expires_at: Date.now() + 3600000,
+      };
+      const token = await tokenStorage.getFlowAccessToken();
+      expect(token).toBe('flow-token-123');
+    });
+
+    it('should return null when flow token is expired or missing', async () => {
+      tokenStorage.tokens = {
+        flow_access_token: 'expired-flow-token',
+        flow_expires_at: Date.now() - 60000,
+      };
+      expect(await tokenStorage.getFlowAccessToken()).toBeNull();
+
+      tokenStorage.tokens = { access_token: 'graph_token' };
+      expect(await tokenStorage.getFlowAccessToken()).toBeNull();
+    });
+  });
+
+  describe('saveFlowTokens', () => {
+    it('should merge flow tokens with existing Graph tokens and persist', async () => {
+      tokenStorage.tokens = {
+        access_token: 'graph-token',
+        refresh_token: 'graph-refresh',
+        expires_at: Date.now() + 3600000,
+      };
+
+      await tokenStorage.saveFlowTokens({
+        access_token: 'flow-token',
+        refresh_token: 'flow-refresh',
+        expires_in: 3600,
+      });
+
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        tokenStorePath,
+        JSON.stringify(tokenStorage.tokens, null, 2),
+        { mode: 0o600 }
+      );
+      expect(tokenStorage.tokens.access_token).toBe('graph-token');
+      expect(tokenStorage.tokens.flow_access_token).toBe('flow-token');
+      expect(tokenStorage.tokens.flow_refresh_token).toBe('flow-refresh');
+      expect(tokenStorage.tokens.flow_expires_at).toBeGreaterThanOrEqual(Date.now());
+    });
+
+    it('should create a new token file when only flow tokens are provided', async () => {
+      tokenStorage.tokens = {};
+
+      await tokenStorage.saveFlowTokens({
+        access_token: 'flow-token',
+        refresh_token: 'flow-refresh',
+        expires_at: Date.now() + 3600000,
+      });
+
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        tokenStorePath,
+        JSON.stringify(tokenStorage.tokens, null, 2),
+        { mode: 0o600 }
+      );
+      expect(tokenStorage.tokens.flow_access_token).toBe('flow-token');
+    });
+  });
+
+  describe('getValidFlowAccessToken', () => {
+    it('should return the flow token when valid', async () => {
+      tokenStorage.tokens = {
+        flow_access_token: 'valid-flow-token',
+        flow_expires_at: Date.now() + 3600000,
+      };
+      const token = await tokenStorage.getValidFlowAccessToken();
+      expect(token).toBe('valid-flow-token');
+      expect(https.request).not.toHaveBeenCalled();
+    });
+
+    it('should return null when flow token is expired and not call OAuth', async () => {
+      tokenStorage.tokens = {
+        flow_access_token: 'expired-flow-token',
+        flow_refresh_token: 'valid-flow-refresh',
+        flow_expires_at: Date.now() - 60000,
+      };
+      const token = await tokenStorage.getValidFlowAccessToken();
+      expect(token).toBeNull();
+      expect(https.request).not.toHaveBeenCalled();
+    });
+
+    it('should load tokens from file when not cached and return the token if valid', async () => {
+      const mockFileTokens = {
+        flow_access_token: 'file-flow-token',
+        flow_expires_at: Date.now() + 3600000,
+      };
+      fs.readFile.mockResolvedValue(JSON.stringify(mockFileTokens));
+      tokenStorage.tokens = null;
+
+      const token = await tokenStorage.getValidFlowAccessToken();
+      expect(fs.readFile).toHaveBeenCalledTimes(1);
+      expect(token).toBe('file-flow-token');
+    });
+  });
+
   describe('clearTokens', () => {
     it('should set tokens to null and attempt to delete file', async () => {
       tokenStorage.tokens = { access_token: 'some_token' };

@@ -2,7 +2,7 @@
  * Power Automate list flows functionality
  */
 const { callFlowAPI } = require('./flow-api');
-const { getFlowAccessToken } = require('../auth/token-manager');
+const { tokenStorage } = require('../auth/index');
 
 /**
  * List flows handler
@@ -22,7 +22,7 @@ async function handleListFlows(args) {
   }
 
   try {
-    const accessToken = getFlowAccessToken();
+    const accessToken = await tokenStorage.getValidFlowAccessToken();
 
     if (!accessToken) {
       return {

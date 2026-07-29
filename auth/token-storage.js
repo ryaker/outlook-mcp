@@ -93,6 +93,59 @@ class TokenStorage {
     return Date.now() >= (this.tokens.expires_at - this.config.refreshTokenBuffer);
   }
 
+  getFlowExpiryTime() {
+    return this.tokens && this.tokens.flow_expires_at ? this.tokens.flow_expires_at : 0;
+  }
+
+  isFlowTokenExpired() {
+    if (!this.tokens || !this.tokens.flow_expires_at) {
+      return true; // No flow token or no expiry means it's effectively expired or invalid
+    }
+    return Date.now() >= this.tokens.flow_expires_at - this.config.refreshTokenBuffer;
+  }
+
+  async getFlowAccessToken() {
+    if (!this.tokens) {
+      await this.getTokens();
+    }
+
+    if (!this.tokens || !this.tokens.flow_access_token || this.isFlowTokenExpired()) {
+      return null;
+    }
+
+    return this.tokens.flow_access_token;
+  }
+
+  async saveFlowTokens(flowTokens) {
+    await this.getTokens(); // Ensure existing tokens are loaded
+
+    this.tokens = {
+      ...this.tokens,
+      flow_access_token: flowTokens.access_token,
+      flow_refresh_token: flowTokens.refresh_token,
+      flow_expires_at:
+        flowTokens.expires_at || Date.now() + (flowTokens.expires_in || 3600) * 1000,
+    };
+
+    await this._saveTokensToFile();
+  }
+
+  async getValidFlowAccessToken() {
+    await this.getTokens(); // Ensure tokens are loaded
+
+    if (!this.tokens || !this.tokens.flow_access_token) {
+      console.log('No flow access token available.');
+      return null;
+    }
+
+    if (this.isFlowTokenExpired()) {
+      console.log('Flow access token expired or nearing expiration. No auto-refresh in this change.');
+      return null;
+    }
+
+    return this.tokens.flow_access_token;
+  }
+
   async getValidAccessToken() {
     await this.getTokens(); // Ensure tokens are loaded
 
