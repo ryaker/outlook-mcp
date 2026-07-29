@@ -3,7 +3,7 @@
  */
 const config = require('../config');
 const tokenManager = require('./token-manager');
-const TokenStorage = require('./token-storage');
+const { tokenStorage } = require('./index');
 
 /**
  * About tool handler
@@ -57,7 +57,6 @@ async function handleAuthenticate(args) {
 async function handleCheckAuthStatus() {
   console.error('[CHECK-AUTH-STATUS] Starting authentication status check');
 
-  const tokenStorage = new TokenStorage();
   const accessToken = await tokenStorage.getValidAccessToken();
 
   console.error(`[CHECK-AUTH-STATUS] Valid access token: ${accessToken ? 'YES' : 'NO'}`);

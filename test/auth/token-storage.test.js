@@ -10,7 +10,7 @@ jest.mock('fs', () => ({
     readFile: jest.fn(),
     writeFile: jest.fn(),
     unlink: jest.fn(),
-  }
+  },
 }));
 jest.mock('https');
 
@@ -48,7 +48,9 @@ describe('TokenStorage', () => {
     it('should warn if client ID or secret is missing', () => {
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
       new TokenStorage({ ...baseConfig, clientId: null });
-      expect(consoleWarnSpy).toHaveBeenCalledWith("TokenStorage: MS_CLIENT_ID or MS_CLIENT_SECRET is not configured. Token operations might fail.");
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'TokenStorage: MS_CLIENT_ID/MS_CLIENT_SECRET (or OUTLOOK_CLIENT_ID/OUTLOOK_CLIENT_SECRET) is not configured. Token operations might fail.'
+      );
       consoleWarnSpy.mockRestore();
     });
 
@@ -84,9 +86,7 @@ describe('TokenStorage', () => {
         redirectUri: 'http://localhost/callback',
         tokenEndpoint: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
       });
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('offline_access')
-      );
+      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('offline_access'));
       delete process.env.MS_SCOPES;
       consoleWarnSpy.mockRestore();
     });
@@ -133,7 +133,11 @@ describe('TokenStorage', () => {
     it('should write tokens to file', async () => {
       tokenStorage.tokens = { access_token: 'save_token' };
       await tokenStorage._saveTokensToFile();
-      expect(fs.writeFile).toHaveBeenCalledWith(tokenStorePath, JSON.stringify(tokenStorage.tokens, null, 2), { mode: 0o600 });
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        tokenStorePath,
+        JSON.stringify(tokenStorage.tokens, null, 2),
+        { mode: 0o600 }
+      );
     });
 
     it('should log warning if no tokens to save', async () => {
@@ -172,17 +176,17 @@ describe('TokenStorage', () => {
     });
 
     it('should only call _loadTokensFromFile once for concurrent calls', async () => {
-        const mockFileTokens = { access_token: 'concurrent_load_token' };
-        fs.readFile.mockResolvedValue(JSON.stringify(mockFileTokens));
+      const mockFileTokens = { access_token: 'concurrent_load_token' };
+      fs.readFile.mockResolvedValue(JSON.stringify(mockFileTokens));
 
-        const promise1 = tokenStorage.getTokens();
-        const promise2 = tokenStorage.getTokens();
+      const promise1 = tokenStorage.getTokens();
+      const promise2 = tokenStorage.getTokens();
 
-        const [tokens1, tokens2] = await Promise.all([promise1, promise2]);
+      const [tokens1, tokens2] = await Promise.all([promise1, promise2]);
 
-        expect(tokens1).toEqual(mockFileTokens);
-        expect(tokens2).toEqual(mockFileTokens);
-        expect(fs.readFile).toHaveBeenCalledTimes(1); // Crucial check
+      expect(tokens1).toEqual(mockFileTokens);
+      expect(tokens2).toEqual(mockFileTokens);
+      expect(fs.readFile).toHaveBeenCalledTimes(1); // Crucial check
     });
   });
 
@@ -200,7 +204,6 @@ describe('TokenStorage', () => {
     });
   });
 
-
   describe('isTokenExpired', () => {
     it('should return true if no tokens or expires_at', () => {
       tokenStorage.tokens = null;
@@ -210,17 +213,23 @@ describe('TokenStorage', () => {
     });
 
     it('should return true if token is past expiration time (considering buffer)', () => {
-      tokenStorage.tokens = { expires_at: Date.now() - (tokenStorage.config.refreshTokenBuffer + 1000) }; // Expired by 1s + buffer
+      tokenStorage.tokens = {
+        expires_at: Date.now() - (tokenStorage.config.refreshTokenBuffer + 1000),
+      }; // Expired by 1s + buffer
       expect(tokenStorage.isTokenExpired()).toBe(true);
     });
 
     it('should return true if token is within buffer period', () => {
-        tokenStorage.tokens = { expires_at: Date.now() + (tokenStorage.config.refreshTokenBuffer - 1000) }; // Expires in buffer - 1s
-        expect(tokenStorage.isTokenExpired()).toBe(true);
+      tokenStorage.tokens = {
+        expires_at: Date.now() + (tokenStorage.config.refreshTokenBuffer - 1000),
+      }; // Expires in buffer - 1s
+      expect(tokenStorage.isTokenExpired()).toBe(true);
     });
 
     it('should return false if token is not expired and outside buffer', () => {
-      tokenStorage.tokens = { expires_at: Date.now() + (tokenStorage.config.refreshTokenBuffer + 60000) }; // Valid for 1 min + buffer
+      tokenStorage.tokens = {
+        expires_at: Date.now() + (tokenStorage.config.refreshTokenBuffer + 60000),
+      }; // Valid for 1 min + buffer
       expect(tokenStorage.isTokenExpired()).toBe(false);
     });
   });
@@ -230,26 +239,27 @@ describe('TokenStorage', () => {
     const mockAuthCode = 'auth_code_123';
 
     beforeEach(() => {
-        mockHttpsRequest = {
-            on: jest.fn((event, cb) => {
-                if (event === 'error') mockHttpsRequest.errorHandler = cb;
-                return mockHttpsRequest;
-            }),
-            write: jest.fn(),
-            end: jest.fn(),
-        };
-        https.request.mockImplementation((url, options, callback) => {
-            mockHttpsRequest.callback = callback; // Store the callback for triggering
-            return mockHttpsRequest;
-        });
+      mockHttpsRequest = {
+        on: jest.fn((event, cb) => {
+          if (event === 'error') mockHttpsRequest.errorHandler = cb;
+          return mockHttpsRequest;
+        }),
+        setTimeout: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+      };
+      https.request.mockImplementation((url, options, callback) => {
+        mockHttpsRequest.callback = callback; // Store the callback for triggering
+        return mockHttpsRequest;
+      });
     });
 
     const mockSuccessfulTokenResponse = {
-        access_token: 'new_access_token',
-        refresh_token: 'new_refresh_token',
-        expires_in: 3600,
-        scope: 'test_scope',
-        token_type: 'Bearer'
+      access_token: 'new_access_token',
+      refresh_token: 'new_refresh_token',
+      expires_in: 3600,
+      scope: 'test_scope',
+      token_type: 'Bearer',
     };
 
     it('should successfully exchange code for tokens and save them', async () => {
@@ -264,7 +274,7 @@ describe('TokenStorage', () => {
         on: (event, cb) => {
           if (event === 'data') cb(Buffer.from(JSON.stringify(mockSuccessfulTokenResponse)));
           if (event === 'end') cb();
-        }
+        },
       };
       mockHttpsRequest.callback(mockRes); // Trigger the https.request callback
 
@@ -293,49 +303,53 @@ describe('TokenStorage', () => {
       jest.spyOn(tokenStorage, '_saveTokensToFile').mockRejectedValueOnce(saveError);
 
       const exchangePromise = tokenStorage.exchangeCodeForTokens(mockAuthCode);
-      const mockRes = { // Simulate successful API response
-          statusCode: 200,
-          on: (event, cb) => {
-              if (event === 'data') cb(Buffer.from(JSON.stringify(mockSuccessfulTokenResponse)));
-              if (event === 'end') cb();
-          }
+      const mockRes = {
+        // Simulate successful API response
+        statusCode: 200,
+        on: (event, cb) => {
+          if (event === 'data') cb(Buffer.from(JSON.stringify(mockSuccessfulTokenResponse)));
+          if (event === 'end') cb();
+        },
       };
       mockHttpsRequest.callback(mockRes);
 
-      await expect(exchangePromise).rejects.toThrow(`Tokens exchanged but failed to save: ${saveError.message}`);
+      await expect(exchangePromise).rejects.toThrow(
+        `Tokens exchanged but failed to save: ${saveError.message}`
+      );
       // Check that tokens were updated in memory before save attempt
       expect(tokenStorage.tokens.access_token).toBe(mockSuccessfulTokenResponse.access_token);
     });
 
     it('should reject on token exchange API error', async () => {
-        const errorResponse = { error: 'invalid_grant', error_description: 'Bad auth code' };
-        const exchangePromise = tokenStorage.exchangeCodeForTokens(mockAuthCode);
-        const mockRes = {
-            statusCode: 400,
-            on: (event, cb) => {
-                if (event === 'data') cb(Buffer.from(JSON.stringify(errorResponse)));
-                if (event === 'end') cb();
-            }
-        };
-        mockHttpsRequest.callback(mockRes);
+      const errorResponse = { error: 'invalid_grant', error_description: 'Bad auth code' };
+      const exchangePromise = tokenStorage.exchangeCodeForTokens(mockAuthCode);
+      const mockRes = {
+        statusCode: 400,
+        on: (event, cb) => {
+          if (event === 'data') cb(Buffer.from(JSON.stringify(errorResponse)));
+          if (event === 'end') cb();
+        },
+      };
+      mockHttpsRequest.callback(mockRes);
 
-        await expect(exchangePromise).rejects.toThrow(errorResponse.error_description);
+      await expect(exchangePromise).rejects.toThrow(errorResponse.error_description);
     });
 
     it('should reject on network error during token exchange', async () => {
-        const networkError = new Error('Network fail');
-        const exchangePromise = tokenStorage.exchangeCodeForTokens(mockAuthCode);
+      const networkError = new Error('Network fail');
+      const exchangePromise = tokenStorage.exchangeCodeForTokens(mockAuthCode);
 
-        // Simulate network error by calling the 'error' handler on the request object
-        mockHttpsRequest.errorHandler(networkError);
+      // Simulate network error by calling the 'error' handler on the request object
+      mockHttpsRequest.errorHandler(networkError);
 
-        await expect(exchangePromise).rejects.toThrow('Network fail');
+      await expect(exchangePromise).rejects.toThrow('Network fail');
     });
 
     it('should reject if client ID or secret is missing', async () => {
-        tokenStorage.config.clientId = null;
-        await expect(tokenStorage.exchangeCodeForTokens(mockAuthCode))
-            .rejects.toThrow("Client ID or Client Secret is not configured. Cannot exchange code for tokens.");
+      tokenStorage.config.clientId = null;
+      await expect(tokenStorage.exchangeCodeForTokens(mockAuthCode)).rejects.toThrow(
+        'Client ID or Client Secret is not configured. Cannot exchange code for tokens.'
+      );
     });
   });
 
@@ -343,149 +357,167 @@ describe('TokenStorage', () => {
     let mockHttpsRequest;
 
     beforeEach(() => {
-        mockHttpsRequest = {
-            on: jest.fn((event, cb) => {
-                if (event === 'error') mockHttpsRequest.errorHandler = cb;
-                return mockHttpsRequest;
-            }),
-            write: jest.fn(),
-            end: jest.fn(),
-        };
-        https.request.mockImplementation((url, options, callback) => {
-            mockHttpsRequest.callback = callback;
-            return mockHttpsRequest;
-        });
-        tokenStorage.tokens = {
-            access_token: 'old_access_token',
-            refresh_token: 'valid_refresh_token',
-            expires_at: Date.now() - 7200000 // Expired 2 hours ago
-        };
+      mockHttpsRequest = {
+        on: jest.fn((event, cb) => {
+          if (event === 'error') mockHttpsRequest.errorHandler = cb;
+          return mockHttpsRequest;
+        }),
+        setTimeout: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+      };
+      https.request.mockImplementation((url, options, callback) => {
+        mockHttpsRequest.callback = callback;
+        return mockHttpsRequest;
+      });
+      tokenStorage.tokens = {
+        access_token: 'old_access_token',
+        refresh_token: 'valid_refresh_token',
+        expires_at: Date.now() - 7200000, // Expired 2 hours ago
+      };
     });
 
     const mockSuccessfulRefreshResponse = {
-        access_token: 'refreshed_access_token',
-        // refresh_token: 'optional_new_refresh_token', // MS sometimes doesn't return new one
-        expires_in: 3600,
+      access_token: 'refreshed_access_token',
+      // refresh_token: 'optional_new_refresh_token', // MS sometimes doesn't return new one
+      expires_in: 3600,
     };
 
     it('should successfully refresh token and save', async () => {
-        const saveSpy = jest.spyOn(tokenStorage, '_saveTokensToFile');
-        const refreshPromise = tokenStorage.refreshAccessToken();
+      const saveSpy = jest.spyOn(tokenStorage, '_saveTokensToFile');
+      const refreshPromise = tokenStorage.refreshAccessToken();
 
-        const mockRes = {
-            statusCode: 200,
-            on: (event, cb) => {
-                if (event === 'data') cb(Buffer.from(JSON.stringify(mockSuccessfulRefreshResponse)));
-                if (event === 'end') cb();
-            }
-        };
-        mockHttpsRequest.callback(mockRes);
+      const mockRes = {
+        statusCode: 200,
+        on: (event, cb) => {
+          if (event === 'data') cb(Buffer.from(JSON.stringify(mockSuccessfulRefreshResponse)));
+          if (event === 'end') cb();
+        },
+      };
+      mockHttpsRequest.callback(mockRes);
 
-        const accessToken = await refreshPromise;
-        expect(accessToken).toBe('refreshed_access_token');
-        expect(tokenStorage.tokens.access_token).toBe('refreshed_access_token');
-        expect(tokenStorage.tokens.expires_at).toBeGreaterThan(Date.now());
-        expect(saveSpy).toHaveBeenCalled();
+      const accessToken = await refreshPromise;
+      expect(accessToken).toBe('refreshed_access_token');
+      expect(tokenStorage.tokens.access_token).toBe('refreshed_access_token');
+      expect(tokenStorage.tokens.expires_at).toBeGreaterThan(Date.now());
+      expect(saveSpy).toHaveBeenCalled();
 
-        const requestBody = querystring.parse(mockHttpsRequest.write.mock.calls[0][0]);
-        expect(requestBody.grant_type).toBe('refresh_token');
-        expect(requestBody.refresh_token).toBe('valid_refresh_token');
-        expect(requestBody.scope).toBe(baseConfig.scopes.join(' '));
+      const requestBody = querystring.parse(mockHttpsRequest.write.mock.calls[0][0]);
+      expect(requestBody.grant_type).toBe('refresh_token');
+      expect(requestBody.refresh_token).toBe('valid_refresh_token');
+      expect(requestBody.scope).toBe(baseConfig.scopes.join(' '));
     });
 
     it('should reject if saving refreshed token fails', async () => {
-        const saveError = new Error('Failed to save disk');
-        // Mock _saveTokensToFile to throw an error *after* a successful API response
-        jest.spyOn(tokenStorage, '_saveTokensToFile').mockRejectedValueOnce(saveError);
+      const saveError = new Error('Failed to save disk');
+      // Mock _saveTokensToFile to throw an error *after* a successful API response
+      jest.spyOn(tokenStorage, '_saveTokensToFile').mockRejectedValueOnce(saveError);
 
-        const refreshPromise = tokenStorage.refreshAccessToken();
-        const mockRes = { // Simulate successful API response
-            statusCode: 200,
-            on: (event, cb) => {
-                if (event === 'data') cb(Buffer.from(JSON.stringify(mockSuccessfulRefreshResponse)));
-                if (event === 'end') cb();
-            }
-        };
-        mockHttpsRequest.callback(mockRes);
+      const refreshPromise = tokenStorage.refreshAccessToken();
+      const mockRes = {
+        // Simulate successful API response
+        statusCode: 200,
+        on: (event, cb) => {
+          if (event === 'data') cb(Buffer.from(JSON.stringify(mockSuccessfulRefreshResponse)));
+          if (event === 'end') cb();
+        },
+      };
+      mockHttpsRequest.callback(mockRes);
 
-        await expect(refreshPromise).rejects.toThrow(`Access token refreshed but failed to save: ${saveError.message}`);
-        // Ensure tokens in memory are updated despite save failure, as per current logic before rejection
-        expect(tokenStorage.tokens.access_token).toBe(mockSuccessfulRefreshResponse.access_token);
+      await expect(refreshPromise).rejects.toThrow(
+        `Access token refreshed but failed to save: ${saveError.message}`
+      );
+      // Ensure tokens in memory are updated despite save failure, as per current logic before rejection
+      expect(tokenStorage.tokens.access_token).toBe(mockSuccessfulRefreshResponse.access_token);
     });
 
     it('should use existing refresh_token if new one is not in response', async () => {
-        const refreshPromise = tokenStorage.refreshAccessToken();
-        const mockRes = {
-            statusCode: 200,
-            on: (event, cb) => {
-                // Response without a new refresh_token
-                if (event === 'data') cb(Buffer.from(JSON.stringify({ ...mockSuccessfulRefreshResponse, refresh_token: undefined })));
-                if (event === 'end') cb();
-            }
-        };
-        mockHttpsRequest.callback(mockRes);
-        await refreshPromise;
-        expect(tokenStorage.tokens.refresh_token).toBe('valid_refresh_token'); // Should remain the same
+      const refreshPromise = tokenStorage.refreshAccessToken();
+      const mockRes = {
+        statusCode: 200,
+        on: (event, cb) => {
+          // Response without a new refresh_token
+          if (event === 'data')
+            cb(
+              Buffer.from(
+                JSON.stringify({ ...mockSuccessfulRefreshResponse, refresh_token: undefined })
+              )
+            );
+          if (event === 'end') cb();
+        },
+      };
+      mockHttpsRequest.callback(mockRes);
+      await refreshPromise;
+      expect(tokenStorage.tokens.refresh_token).toBe('valid_refresh_token'); // Should remain the same
     });
 
     it('should update refresh_token if a new one is in response', async () => {
-        const refreshPromise = tokenStorage.refreshAccessToken();
-        const mockRes = {
-            statusCode: 200,
-            on: (event, cb) => {
-                 if (event === 'data') cb(Buffer.from(JSON.stringify({ ...mockSuccessfulRefreshResponse, refresh_token: 'new_returned_refresh_token' })));
-                if (event === 'end') cb();
-            }
-        };
-        mockHttpsRequest.callback(mockRes);
-        await refreshPromise;
-        expect(tokenStorage.tokens.refresh_token).toBe('new_returned_refresh_token');
+      const refreshPromise = tokenStorage.refreshAccessToken();
+      const mockRes = {
+        statusCode: 200,
+        on: (event, cb) => {
+          if (event === 'data')
+            cb(
+              Buffer.from(
+                JSON.stringify({
+                  ...mockSuccessfulRefreshResponse,
+                  refresh_token: 'new_returned_refresh_token',
+                })
+              )
+            );
+          if (event === 'end') cb();
+        },
+      };
+      mockHttpsRequest.callback(mockRes);
+      await refreshPromise;
+      expect(tokenStorage.tokens.refresh_token).toBe('new_returned_refresh_token');
     });
 
     it('should reject and clear promise on refresh API error', async () => {
-        const errorResponse = { error: 'invalid_grant', error_description: 'Refresh token expired' };
-        const refreshPromise = tokenStorage.refreshAccessToken();
-        const mockRes = {
-            statusCode: 400,
-            on: (event, cb) => {
-                if (event === 'data') cb(Buffer.from(JSON.stringify(errorResponse)));
-                if (event === 'end') cb();
-            }
-        };
-        mockHttpsRequest.callback(mockRes);
+      const errorResponse = { error: 'invalid_grant', error_description: 'Refresh token expired' };
+      const refreshPromise = tokenStorage.refreshAccessToken();
+      const mockRes = {
+        statusCode: 400,
+        on: (event, cb) => {
+          if (event === 'data') cb(Buffer.from(JSON.stringify(errorResponse)));
+          if (event === 'end') cb();
+        },
+      };
+      mockHttpsRequest.callback(mockRes);
 
-        await expect(refreshPromise).rejects.toThrow(errorResponse.error_description);
-        expect(tokenStorage._refreshPromise).toBeNull();
+      await expect(refreshPromise).rejects.toThrow(errorResponse.error_description);
+      expect(tokenStorage._refreshPromise).toBeNull();
     });
 
     it('should throw if no refresh token is available', async () => {
-        tokenStorage.tokens.refresh_token = null;
-        await expect(tokenStorage.refreshAccessToken())
-            .rejects.toThrow('No refresh token available to refresh the access token.');
+      tokenStorage.tokens.refresh_token = null;
+      await expect(tokenStorage.refreshAccessToken()).rejects.toThrow(
+        'No refresh token available to refresh the access token.'
+      );
     });
 
     it('should handle concurrent refresh calls by returning the same promise', async () => {
-        const promise1 = tokenStorage.refreshAccessToken();
-        const promise2 = tokenStorage.refreshAccessToken();
+      const promise1 = tokenStorage.refreshAccessToken();
+      const promise2 = tokenStorage.refreshAccessToken();
 
-        // Both calls should share the same underlying _refreshPromise (deduplication)
-        expect(tokenStorage._refreshPromise).not.toBeNull();
+      // Both calls should share the same underlying _refreshPromise (deduplication)
+      expect(tokenStorage._refreshPromise).not.toBeNull();
 
-        // Simulate successful response for the single underlying HTTP request
-        const mockRes = {
-            statusCode: 200,
-            on: (event, cb) => {
-                if (event === 'data') cb(Buffer.from(JSON.stringify(mockSuccessfulRefreshResponse)));
-                if (event === 'end') cb();
-            }
-        };
-        mockHttpsRequest.callback(mockRes);
+      // Simulate successful response for the single underlying HTTP request
+      const mockRes = {
+        statusCode: 200,
+        on: (event, cb) => {
+          if (event === 'data') cb(Buffer.from(JSON.stringify(mockSuccessfulRefreshResponse)));
+          if (event === 'end') cb();
+        },
+      };
+      mockHttpsRequest.callback(mockRes);
 
-        const [accessToken1, accessToken2] = await Promise.all([promise1, promise2]);
-        expect(accessToken1).toBe('refreshed_access_token');
-        expect(accessToken2).toBe('refreshed_access_token');
-        expect(https.request).toHaveBeenCalledTimes(1); // Crucial: only one actual HTTP request
-        expect(tokenStorage._refreshPromise).toBeNull(); // Promise should be cleared after resolution
+      const [accessToken1, accessToken2] = await Promise.all([promise1, promise2]);
+      expect(accessToken1).toBe('refreshed_access_token');
+      expect(accessToken2).toBe('refreshed_access_token');
+      expect(https.request).toHaveBeenCalledTimes(1); // Crucial: only one actual HTTP request
+      expect(tokenStorage._refreshPromise).toBeNull(); // Promise should be cleared after resolution
     });
   });
 
@@ -499,6 +531,7 @@ describe('TokenStorage', () => {
           if (event === 'error') mockHttpsRequest.errorHandler = cb;
           return mockHttpsRequest;
         }),
+        setTimeout: jest.fn(),
         write: jest.fn(),
         end: jest.fn(),
       };
@@ -646,88 +679,101 @@ describe('TokenStorage', () => {
 
   describe('getValidAccessToken', () => {
     beforeEach(() => {
-        // Ensure tokens are loaded for these tests, or mock _loadTokensFromFile / getTokens
-        jest.spyOn(tokenStorage, 'getTokens').mockImplementation(async () => tokenStorage.tokens);
+      // Ensure tokens are loaded for these tests, or mock _loadTokensFromFile / getTokens
+      jest.spyOn(tokenStorage, 'getTokens').mockImplementation(async () => tokenStorage.tokens);
     });
 
     it('should return existing token if valid and not near expiry', async () => {
-        tokenStorage.tokens = { access_token: 'valid_token', expires_at: Date.now() + 3600000 }; // Expires in 1 hour
-        const token = await tokenStorage.getValidAccessToken();
-        expect(token).toBe('valid_token');
-        expect(https.request).not.toHaveBeenCalled(); // No refresh attempt
+      tokenStorage.tokens = { access_token: 'valid_token', expires_at: Date.now() + 3600000 }; // Expires in 1 hour
+      const token = await tokenStorage.getValidAccessToken();
+      expect(token).toBe('valid_token');
+      expect(https.request).not.toHaveBeenCalled(); // No refresh attempt
     });
 
     it('should attempt refresh if token is expired and refresh token exists', async () => {
-        tokenStorage.tokens = {
-            access_token: 'expired_token',
-            refresh_token: 'can_refresh',
-            expires_at: Date.now() - 1000
-        };
-        const refreshSpy = jest.spyOn(tokenStorage, 'refreshAccessToken').mockResolvedValue('refreshed_token_from_spy');
+      tokenStorage.tokens = {
+        access_token: 'expired_token',
+        refresh_token: 'can_refresh',
+        expires_at: Date.now() - 1000,
+      };
+      const refreshSpy = jest
+        .spyOn(tokenStorage, 'refreshAccessToken')
+        .mockResolvedValue('refreshed_token_from_spy');
 
-        const token = await tokenStorage.getValidAccessToken();
-        expect(refreshSpy).toHaveBeenCalled();
-        expect(token).toBe('refreshed_token_from_spy');
+      const token = await tokenStorage.getValidAccessToken();
+      expect(refreshSpy).toHaveBeenCalled();
+      expect(token).toBe('refreshed_token_from_spy');
     });
 
     it('should return null and clear tokens if refresh fails', async () => {
-        tokenStorage.tokens = {
-            access_token: 'expired_token_will_fail',
-            refresh_token: 'will_fail_refresh',
-            expires_at: Date.now() - 1000
-        };
-        jest.spyOn(tokenStorage, 'refreshAccessToken').mockRejectedValue(new Error('Refresh failed'));
-        const saveSpy = jest.spyOn(tokenStorage, '_saveTokensToFile');
+      tokenStorage.tokens = {
+        access_token: 'expired_token_will_fail',
+        refresh_token: 'will_fail_refresh',
+        expires_at: Date.now() - 1000,
+      };
+      jest.spyOn(tokenStorage, 'refreshAccessToken').mockRejectedValue(new Error('Refresh failed'));
+      const saveSpy = jest.spyOn(tokenStorage, '_saveTokensToFile');
 
-        const token = await tokenStorage.getValidAccessToken();
-        expect(token).toBeNull();
-        expect(tokenStorage.tokens).toBeNull(); // Tokens should be invalidated
-        expect(saveSpy).toHaveBeenCalled(); // Invalidation should be persisted
+      const token = await tokenStorage.getValidAccessToken();
+      expect(token).toBeNull();
+      expect(tokenStorage.tokens).toBeNull(); // Tokens should be invalidated
+      expect(saveSpy).toHaveBeenCalled(); // Invalidation should be persisted
     });
 
     it('should propagate error if saving nulled token fails after refresh failure', async () => {
-        tokenStorage.tokens = { access_token: 'expired_token_save_fail', refresh_token: 'refresh_me', expires_at: Date.now() - 1000 };
-        jest.spyOn(tokenStorage, 'refreshAccessToken').mockRejectedValue(new Error('Refresh API down'));
-        const saveError = new Error('Disk write error during null save');
-        jest.spyOn(tokenStorage, '_saveTokensToFile').mockRejectedValueOnce(saveError); // This is key
+      tokenStorage.tokens = {
+        access_token: 'expired_token_save_fail',
+        refresh_token: 'refresh_me',
+        expires_at: Date.now() - 1000,
+      };
+      jest
+        .spyOn(tokenStorage, 'refreshAccessToken')
+        .mockRejectedValue(new Error('Refresh API down'));
+      const saveError = new Error('Disk write error during null save');
+      jest.spyOn(tokenStorage, '_saveTokensToFile').mockRejectedValueOnce(saveError); // This is key
 
-        await expect(tokenStorage.getValidAccessToken()).rejects.toThrow(saveError);
-        expect(tokenStorage.tokens).toBeNull(); // Still nulled in memory
+      await expect(tokenStorage.getValidAccessToken()).rejects.toThrow(saveError);
+      expect(tokenStorage.tokens).toBeNull(); // Still nulled in memory
     });
 
     it('should return null and clear tokens if expired and no refresh token', async () => {
-        tokenStorage.tokens = {
-            access_token: 'expired_no_refresh',
-            expires_at: Date.now() - 1000
-            // No refresh_token
-        };
-        const saveSpy = jest.spyOn(tokenStorage, '_saveTokensToFile').mockResolvedValue(true); // Assume save works for this path
-        const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      tokenStorage.tokens = {
+        access_token: 'expired_no_refresh',
+        expires_at: Date.now() - 1000,
+        // No refresh_token
+      };
+      const saveSpy = jest.spyOn(tokenStorage, '_saveTokensToFile').mockResolvedValue(true); // Assume save works for this path
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
-        const token = await tokenStorage.getValidAccessToken();
-        expect(token).toBeNull();
-        expect(consoleWarnSpy).toHaveBeenCalledWith('No refresh token available. Cannot refresh access token.');
-        expect(tokenStorage.tokens).toBeNull();
-        expect(saveSpy).toHaveBeenCalled();
-        consoleWarnSpy.mockRestore();
+      const token = await tokenStorage.getValidAccessToken();
+      expect(token).toBeNull();
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'No refresh token available. Cannot refresh access token.'
+      );
+      expect(tokenStorage.tokens).toBeNull();
+      expect(saveSpy).toHaveBeenCalled();
+      consoleWarnSpy.mockRestore();
     });
 
     it('should propagate error if saving nulled token fails (no refresh token path)', async () => {
-        tokenStorage.tokens = { access_token: 'expired_no_refresh_save_fail', expires_at: Date.now() - 1000 };
-        const saveError = new Error('Disk write error during null save (no-refresh path)');
-        jest.spyOn(tokenStorage, '_saveTokensToFile').mockRejectedValueOnce(saveError);
+      tokenStorage.tokens = {
+        access_token: 'expired_no_refresh_save_fail',
+        expires_at: Date.now() - 1000,
+      };
+      const saveError = new Error('Disk write error during null save (no-refresh path)');
+      jest.spyOn(tokenStorage, '_saveTokensToFile').mockRejectedValueOnce(saveError);
 
-        await expect(tokenStorage.getValidAccessToken()).rejects.toThrow(saveError);
-        expect(tokenStorage.tokens).toBeNull(); // Still nulled in memory
+      await expect(tokenStorage.getValidAccessToken()).rejects.toThrow(saveError);
+      expect(tokenStorage.tokens).toBeNull(); // Still nulled in memory
     });
 
     it('should return null if no tokens are loaded initially', async () => {
-        tokenStorage.tokens = null; // Simulate no tokens loaded
-        // Ensure getTokens returns the current null state for this specific test
-        tokenStorage.getTokens.mockResolvedValue(null);
+      tokenStorage.tokens = null; // Simulate no tokens loaded
+      // Ensure getTokens returns the current null state for this specific test
+      tokenStorage.getTokens.mockResolvedValue(null);
 
-        const token = await tokenStorage.getValidAccessToken();
-        expect(token).toBeNull();
+      const token = await tokenStorage.getValidAccessToken();
+      expect(token).toBeNull();
     });
   });
 
@@ -877,7 +923,7 @@ describe('TokenStorage', () => {
       consoleWarnSpy.mockRestore();
     });
 
-    it('should return null and invalidate flow tokens when refresh fails', async () => {
+    it('should return null and invalidate flow tokens when refresh fails with invalid_grant', async () => {
       tokenStorage.tokens = {
         flow_access_token: 'expired-flow-token',
         flow_refresh_token: 'will-fail-flow-refresh',
@@ -887,7 +933,7 @@ describe('TokenStorage', () => {
       };
       jest
         .spyOn(tokenStorage, 'refreshFlowAccessToken')
-        .mockRejectedValue(new Error('Flow refresh failed'));
+        .mockRejectedValue(new Error('invalid_grant: Flow refresh token expired'));
       const saveSpy = jest.spyOn(tokenStorage, '_saveTokensToFile');
 
       const token = await tokenStorage.getValidFlowAccessToken();
@@ -896,6 +942,27 @@ describe('TokenStorage', () => {
       expect(tokenStorage.tokens.flow_refresh_token).toBeNull();
       expect(tokenStorage.tokens.access_token).toBe('graph-token');
       expect(saveSpy).toHaveBeenCalled();
+    });
+
+    it('should return null but NOT invalidate flow tokens on transient refresh failure', async () => {
+      tokenStorage.tokens = {
+        flow_access_token: 'expired-flow-token',
+        flow_refresh_token: 'will-fail-flow-refresh',
+        flow_expires_at: Date.now() - 60000,
+        access_token: 'graph-token',
+        refresh_token: 'graph-refresh',
+      };
+      jest
+        .spyOn(tokenStorage, 'refreshFlowAccessToken')
+        .mockRejectedValue(new Error('Flow refresh failed (transient)'));
+      const saveSpy = jest.spyOn(tokenStorage, '_saveTokensToFile');
+
+      const token = await tokenStorage.getValidFlowAccessToken();
+      expect(token).toBeNull();
+      expect(tokenStorage.tokens.flow_access_token).toBe('expired-flow-token');
+      expect(tokenStorage.tokens.flow_refresh_token).toBe('will-fail-flow-refresh');
+      expect(tokenStorage.tokens.access_token).toBe('graph-token');
+      expect(saveSpy).not.toHaveBeenCalled();
     });
 
     it('should load tokens from file when not cached and return the token if valid', async () => {

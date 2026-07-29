@@ -38,7 +38,7 @@ class TokenStorage {
 
     if (!this.config.clientId || !this.config.clientSecret) {
       console.warn(
-        'TokenStorage: MS_CLIENT_ID or MS_CLIENT_SECRET is not configured. Token operations might fail.'
+        'TokenStorage: MS_CLIENT_ID/MS_CLIENT_SECRET (or OUTLOOK_CLIENT_ID/OUTLOOK_CLIENT_SECRET) is not configured. Token operations might fail.'
       );
     }
 
@@ -136,9 +136,12 @@ class TokenStorage {
     this.tokens = {
       ...this.tokens,
       flow_access_token: flowTokens.access_token,
-      flow_refresh_token: flowTokens.refresh_token,
       flow_expires_at: flowTokens.expires_at || Date.now() + (flowTokens.expires_in || 3600) * 1000,
     };
+
+    if (flowTokens.refresh_token) {
+      this.tokens.flow_refresh_token = flowTokens.refresh_token;
+    }
 
     await this._saveTokensToFile();
   }
@@ -158,10 +161,15 @@ class TokenStorage {
           return await this.refreshFlowAccessToken();
         } catch (refreshError) {
           console.error('Failed to refresh flow access token:', refreshError);
-          // Invalidate only flow tokens; preserve Graph keys
-          this.tokens.flow_access_token = null;
-          this.tokens.flow_refresh_token = null;
-          await this._saveTokensToFile(); // Persist invalidation
+          // Only invalidate flow tokens for permanent failures, not transient
+          if (
+            refreshError.message.includes('invalid_grant') ||
+            refreshError.message.includes('No flow refresh token')
+          ) {
+            this.tokens.flow_access_token = null;
+            this.tokens.flow_refresh_token = null;
+            await this._saveTokensToFile(); // Persist invalidation
+          }
           return null;
         }
       } else {
@@ -277,6 +285,9 @@ class TokenStorage {
           }
         });
       });
+      req.setTimeout(30000, () => {
+        req.destroy(new Error('Request timed out after 30 seconds'));
+      });
       req.on('error', (error) => {
         console.error('HTTP error during token refresh:', error);
         reject(error);
@@ -343,13 +354,17 @@ class TokenStorage {
               }
             } else {
               console.error('Error refreshing flow token:', responseBody);
-              // Invalidate only flow tokens; preserve Graph tokens
-              this.tokens.flow_access_token = null;
-              this.tokens.flow_refresh_token = null;
-              try {
-                await this._saveTokensToFile();
-              } catch (saveError) {
-                console.error('Failed to save invalidated flow tokens:', saveError);
+              // Only invalidate flow tokens for permanent OAuth failures
+              const isPermanentFailure =
+                res.statusCode === 400 && responseBody.error === 'invalid_grant';
+              if (isPermanentFailure) {
+                this.tokens.flow_access_token = null;
+                this.tokens.flow_refresh_token = null;
+                try {
+                  await this._saveTokensToFile();
+                } catch (saveError) {
+                  console.error('Failed to save invalidated flow tokens:', saveError);
+                }
               }
               reject(
                 new Error(
@@ -366,18 +381,12 @@ class TokenStorage {
           }
         });
       });
-      req.on('error', async (error) => {
+      req.setTimeout(30000, () => {
+        req.destroy(new Error('Request timed out after 30 seconds'));
+      });
+      req.on('error', (error) => {
         console.error('HTTP error during flow token refresh:', error);
-        // Invalidate only flow tokens on network error as well
-        if (this.tokens) {
-          this.tokens.flow_access_token = null;
-          this.tokens.flow_refresh_token = null;
-          try {
-            await this._saveTokensToFile();
-          } catch (saveError) {
-            console.error('Failed to save invalidated flow tokens:', saveError);
-          }
-        }
+        // Do not invalidate flow tokens on transient network errors
         reject(error);
         this._flowRefreshPromise = null; // Clear promise on error
       });
@@ -451,15 +460,19 @@ class TokenStorage {
             // Catch any error during parsing or saving
             console.error(
               'Error processing token exchange response or saving tokens:',
-              e,
-              'Raw data:',
-              data
+              e.message,
+              `Response length: ${data.length}`
             );
             reject(
-              new Error(`Error processing token response: ${e.message}. Response data: ${data}`)
+              new Error(
+                `Error processing token response: ${e.message} (response length: ${data.length})`
+              )
             );
           }
         });
+      });
+      req.setTimeout(30000, () => {
+        req.destroy(new Error('Request timed out after 30 seconds'));
       });
       req.on('error', (error) => {
         console.error('HTTP error during code exchange:', error);
