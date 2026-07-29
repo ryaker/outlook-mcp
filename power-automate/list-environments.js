@@ -2,7 +2,7 @@
  * Power Automate list environments functionality
  */
 const { callFlowAPI } = require('./flow-api');
-const { getFlowAccessToken } = require('../auth/token-manager');
+const { tokenStorage } = require('../auth/index');
 
 /**
  * List environments handler
@@ -11,7 +11,7 @@ const { getFlowAccessToken } = require('../auth/token-manager');
  */
 async function handleListEnvironments(args) {
   try {
-    const accessToken = getFlowAccessToken();
+    const accessToken = await tokenStorage.getValidFlowAccessToken();
 
     if (!accessToken) {
       return {
