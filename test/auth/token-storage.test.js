@@ -90,6 +90,12 @@ describe('TokenStorage', () => {
       delete process.env.MS_SCOPES;
       consoleWarnSpy.mockRestore();
     });
+
+    it('should default flowScope from config.js FLOW_SCOPE and allow override', () => {
+      expect(tokenStorage.config.flowScope).toBe(config.FLOW_SCOPE);
+      const customStorage = new TokenStorage({ ...baseConfig, flowScope: 'custom-flow-scope' });
+      expect(customStorage.config.flowScope).toBe('custom-flow-scope');
+    });
   });
 
   describe('_loadTokensFromFile', () => {
@@ -483,6 +489,161 @@ describe('TokenStorage', () => {
     });
   });
 
+  describe('refreshFlowAccessToken', () => {
+    let mockHttpsRequest;
+    const mockFlowRefreshToken = 'valid-flow-refresh';
+
+    beforeEach(() => {
+      mockHttpsRequest = {
+        on: jest.fn((event, cb) => {
+          if (event === 'error') mockHttpsRequest.errorHandler = cb;
+          return mockHttpsRequest;
+        }),
+        write: jest.fn(),
+        end: jest.fn(),
+      };
+      https.request.mockImplementation((url, options, callback) => {
+        mockHttpsRequest.callback = callback;
+        return mockHttpsRequest;
+      });
+      tokenStorage.tokens = {
+        access_token: 'graph_access_token',
+        refresh_token: 'graph_refresh_token',
+        expires_at: Date.now() + 3600000,
+        flow_access_token: 'old_flow_access_token',
+        flow_refresh_token: mockFlowRefreshToken,
+        flow_expires_at: Date.now() - 7200000, // Expired 2 hours ago
+      };
+    });
+
+    const mockSuccessfulFlowRefreshResponse = {
+      access_token: 'refreshed_flow_access_token',
+      expires_in: 3600,
+    };
+
+    it('should successfully refresh flow token and save', async () => {
+      const saveSpy = jest.spyOn(tokenStorage, '_saveTokensToFile');
+      const refreshPromise = tokenStorage.refreshFlowAccessToken();
+
+      const mockRes = {
+        statusCode: 200,
+        on: (event, cb) => {
+          if (event === 'data') cb(Buffer.from(JSON.stringify(mockSuccessfulFlowRefreshResponse)));
+          if (event === 'end') cb();
+        },
+      };
+      mockHttpsRequest.callback(mockRes);
+
+      const accessToken = await refreshPromise;
+      expect(accessToken).toBe('refreshed_flow_access_token');
+      expect(tokenStorage.tokens.flow_access_token).toBe('refreshed_flow_access_token');
+      expect(tokenStorage.tokens.flow_expires_at).toBeGreaterThan(Date.now());
+      expect(tokenStorage.tokens.access_token).toBe('graph_access_token');
+      expect(saveSpy).toHaveBeenCalled();
+
+      const requestBody = querystring.parse(mockHttpsRequest.write.mock.calls[0][0]);
+      expect(requestBody.grant_type).toBe('refresh_token');
+      expect(requestBody.refresh_token).toBe(mockFlowRefreshToken);
+      expect(requestBody.scope).toBe(config.FLOW_SCOPE);
+    });
+
+    it('should update flow_refresh_token if a new one is in response', async () => {
+      const refreshPromise = tokenStorage.refreshFlowAccessToken();
+      const mockRes = {
+        statusCode: 200,
+        on: (event, cb) => {
+          if (event === 'data')
+            cb(
+              Buffer.from(
+                JSON.stringify({
+                  ...mockSuccessfulFlowRefreshResponse,
+                  refresh_token: 'new_flow_refresh_token',
+                })
+              )
+            );
+          if (event === 'end') cb();
+        },
+      };
+      mockHttpsRequest.callback(mockRes);
+      await refreshPromise;
+      expect(tokenStorage.tokens.flow_refresh_token).toBe('new_flow_refresh_token');
+    });
+
+    it('should keep existing flow_refresh_token if response does not include one', async () => {
+      const refreshPromise = tokenStorage.refreshFlowAccessToken();
+      const mockRes = {
+        statusCode: 200,
+        on: (event, cb) => {
+          if (event === 'data')
+            cb(
+              Buffer.from(
+                JSON.stringify({
+                  ...mockSuccessfulFlowRefreshResponse,
+                  refresh_token: undefined,
+                })
+              )
+            );
+          if (event === 'end') cb();
+        },
+      };
+      mockHttpsRequest.callback(mockRes);
+      await refreshPromise;
+      expect(tokenStorage.tokens.flow_refresh_token).toBe(mockFlowRefreshToken);
+    });
+
+    it('should reject and clear flow tokens on API error while preserving Graph tokens', async () => {
+      const errorResponse = {
+        error: 'invalid_grant',
+        error_description: 'Flow refresh token expired',
+      };
+      const refreshPromise = tokenStorage.refreshFlowAccessToken();
+      const mockRes = {
+        statusCode: 400,
+        on: (event, cb) => {
+          if (event === 'data') cb(Buffer.from(JSON.stringify(errorResponse)));
+          if (event === 'end') cb();
+        },
+      };
+      mockHttpsRequest.callback(mockRes);
+
+      await expect(refreshPromise).rejects.toThrow(errorResponse.error_description);
+      expect(tokenStorage.tokens.flow_access_token).toBeNull();
+      expect(tokenStorage.tokens.flow_refresh_token).toBeNull();
+      expect(tokenStorage.tokens.access_token).toBe('graph_access_token');
+      expect(tokenStorage.tokens.refresh_token).toBe('graph_refresh_token');
+      expect(fs.writeFile).toHaveBeenCalled();
+    });
+
+    it('should throw if no flow refresh token is available', async () => {
+      tokenStorage.tokens.flow_refresh_token = null;
+      await expect(tokenStorage.refreshFlowAccessToken()).rejects.toThrow(
+        'No flow refresh token available to refresh the flow access token.'
+      );
+    });
+
+    it('should handle concurrent refresh calls by returning the same promise', async () => {
+      const promise1 = tokenStorage.refreshFlowAccessToken();
+      const promise2 = tokenStorage.refreshFlowAccessToken();
+
+      expect(tokenStorage._flowRefreshPromise).not.toBeNull();
+
+      const mockRes = {
+        statusCode: 200,
+        on: (event, cb) => {
+          if (event === 'data') cb(Buffer.from(JSON.stringify(mockSuccessfulFlowRefreshResponse)));
+          if (event === 'end') cb();
+        },
+      };
+      mockHttpsRequest.callback(mockRes);
+
+      const [accessToken1, accessToken2] = await Promise.all([promise1, promise2]);
+      expect(accessToken1).toBe('refreshed_flow_access_token');
+      expect(accessToken2).toBe('refreshed_flow_access_token');
+      expect(https.request).toHaveBeenCalledTimes(1);
+      expect(tokenStorage._flowRefreshPromise).toBeNull();
+    });
+  });
+
   describe('getValidAccessToken', () => {
     beforeEach(() => {
         // Ensure tokens are loaded for these tests, or mock _loadTokensFromFile / getTokens
@@ -667,6 +828,10 @@ describe('TokenStorage', () => {
   });
 
   describe('getValidFlowAccessToken', () => {
+    beforeEach(() => {
+      jest.spyOn(tokenStorage, 'getTokens').mockImplementation(async () => tokenStorage.tokens);
+    });
+
     it('should return the flow token when valid', async () => {
       tokenStorage.tokens = {
         flow_access_token: 'valid-flow-token',
@@ -677,15 +842,60 @@ describe('TokenStorage', () => {
       expect(https.request).not.toHaveBeenCalled();
     });
 
-    it('should return null when flow token is expired and not call OAuth', async () => {
+    it('should refresh expired flow token when flow_refresh_token exists', async () => {
       tokenStorage.tokens = {
         flow_access_token: 'expired-flow-token',
         flow_refresh_token: 'valid-flow-refresh',
         flow_expires_at: Date.now() - 60000,
       };
+      jest
+        .spyOn(tokenStorage, 'refreshFlowAccessToken')
+        .mockResolvedValue('refreshed-flow-token-from-spy');
+
+      const token = await tokenStorage.getValidFlowAccessToken();
+      expect(tokenStorage.refreshFlowAccessToken).toHaveBeenCalled();
+      expect(token).toBe('refreshed-flow-token-from-spy');
+    });
+
+    it('should return null and not call OAuth when flow token is expired and no flow_refresh_token exists', async () => {
+      tokenStorage.tokens = {
+        flow_access_token: 'expired-flow-token',
+        flow_expires_at: Date.now() - 60000,
+      };
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const refreshSpy = jest
+        .spyOn(tokenStorage, 'refreshFlowAccessToken')
+        .mockRejectedValue(new Error('Should not be called'));
+
       const token = await tokenStorage.getValidFlowAccessToken();
       expect(token).toBeNull();
+      expect(refreshSpy).not.toHaveBeenCalled();
       expect(https.request).not.toHaveBeenCalled();
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'No flow refresh token available. Cannot refresh flow access token.'
+      );
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should return null and invalidate flow tokens when refresh fails', async () => {
+      tokenStorage.tokens = {
+        flow_access_token: 'expired-flow-token',
+        flow_refresh_token: 'will-fail-flow-refresh',
+        flow_expires_at: Date.now() - 60000,
+        access_token: 'graph-token',
+        refresh_token: 'graph-refresh',
+      };
+      jest
+        .spyOn(tokenStorage, 'refreshFlowAccessToken')
+        .mockRejectedValue(new Error('Flow refresh failed'));
+      const saveSpy = jest.spyOn(tokenStorage, '_saveTokensToFile');
+
+      const token = await tokenStorage.getValidFlowAccessToken();
+      expect(token).toBeNull();
+      expect(tokenStorage.tokens.flow_access_token).toBeNull();
+      expect(tokenStorage.tokens.flow_refresh_token).toBeNull();
+      expect(tokenStorage.tokens.access_token).toBe('graph-token');
+      expect(saveSpy).toHaveBeenCalled();
     });
 
     it('should load tokens from file when not cached and return the token if valid', async () => {
@@ -695,6 +905,7 @@ describe('TokenStorage', () => {
       };
       fs.readFile.mockResolvedValue(JSON.stringify(mockFileTokens));
       tokenStorage.tokens = null;
+      tokenStorage.getTokens.mockRestore();
 
       const token = await tokenStorage.getValidFlowAccessToken();
       expect(fs.readFile).toHaveBeenCalledTimes(1);
