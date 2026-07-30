@@ -192,11 +192,16 @@ MS_CLIENT_ID=your-application-client-id-here
 MS_CLIENT_SECRET=your-client-secret-VALUE-here
 MS_TENANT_ID=your-tenant-id-here
 USE_TEST_MODE=false
+
+# Optional: override the requested OAuth scopes (space separated)
+MS_SCOPES=offline_access User.Read Mail.ReadWrite Mail.Send Calendars.ReadWrite
 ```
 
 **Important Notes:**
 - Use `MS_CLIENT_ID` and `MS_CLIENT_SECRET` in the `.env` file
 - Set `MS_TENANT_ID` for single-tenant apps to avoid `/common` endpoint errors
+- `MS_SCOPES` is optional; when set it is used both for the consent request and for
+  token refresh. Leave it unset to keep the default scope list.
 - For Claude Desktop config, you'll use `OUTLOOK_CLIENT_ID` and `OUTLOOK_CLIENT_SECRET`
 - Always use the client secret **VALUE**, never the Secret ID
 

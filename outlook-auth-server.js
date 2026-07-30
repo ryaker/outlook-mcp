@@ -43,7 +43,9 @@ const AUTH_CONFIG = {
   tenantId: process.env.MS_TENANT_ID || 'common',
   authorityHost: (process.env.MS_AUTHORITY_HOST || 'https://login.microsoftonline.com').replace(/\/+$/, ''),
   redirectUri: 'http://localhost:3333/auth/callback',
-  scopes: [
+  // MS_SCOPES honours the same env var token-storage.js uses for refresh, so the
+  // consented scopes and the refreshed scopes can't drift apart.
+  scopes: (process.env.MS_SCOPES || [
     'offline_access',
     'User.Read',
     'Mail.Read',
@@ -51,7 +53,7 @@ const AUTH_CONFIG = {
     'Calendars.Read',
     'Calendars.ReadWrite',
     'Contacts.Read'
-  ],
+  ].join(' ')).split(' ').filter(Boolean),
   tokenStorePath: path.join(process.env.HOME || process.env.USERPROFILE, '.outlook-mcp-tokens.json')
 };
 
