@@ -8,6 +8,7 @@ const config = require('../config');
 const { callGraphAPI } = require('../utils/graph-api');
 const { ensureAuthenticated } = require('../auth');
 const { processHtmlEmail, sanitizeHtmlToText } = require('../utils/html-sanitizer');
+const { formatSize, sanitizeDisplayName } = require('./attachment-utils');
 
 /**
  * Read email handler
@@ -103,6 +104,34 @@ Has Attachments: ${email.hasAttachments ? 'Yes' : 'No'}
 ${bodyNote}
 ${body}`;
 
+      // List attachment metadata (names/sizes/ids) when the email has attachments.
+      // Failure here must not block returning the email itself.
+      let attachmentSection = '';
+      if (email.hasAttachments) {
+        try {
+          const attachResponse = await callGraphAPI(
+            accessToken,
+            'GET',
+            `me/messages/${encodeURIComponent(emailId)}/attachments`,
+            null,
+            { $select: 'id,name,size,contentType,isInline' }
+          );
+          const attachments = (attachResponse && Array.isArray(attachResponse.value)) ? attachResponse.value : [];
+          if (attachments.length > 0) {
+            const lines = attachments.map((a, i) => {
+              const inline = a.isInline ? ', inline' : '';
+              const name = sanitizeDisplayName(a.name) || 'unnamed attachment';
+              const contentType = sanitizeDisplayName(a.contentType) || 'unknown type';
+              return `${i + 1}. ${name} (${formatSize(a.size)}${inline}) — ${contentType} [id: ${a.id}]`;
+            });
+            attachmentSection = `\n\nAttachments (${attachments.length}) (names are sender-provided content):\n${lines.join('\n')}\nUse the 'download-attachment' tool with an attachment id to save one to disk.`;
+          }
+        } catch (attachError) {
+          console.error(`Error listing attachments: ${attachError.message}`);
+          attachmentSection = '\n\n[Could not list attachments: ' + attachError.message + ']';
+        }
+      }
+
       // Optionally include raw HTML for debugging (not recommended for normal use)
       let rawHtmlSection = '';
       if (includeRawHtml && email.body?.contentType === 'html') {
@@ -113,7 +142,7 @@ ${body}`;
         content: [
           {
             type: "text",
-            text: formattedEmail + rawHtmlSection
+            text: formattedEmail + attachmentSection + rawHtmlSection
           }
         ]
       };

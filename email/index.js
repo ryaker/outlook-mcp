@@ -8,6 +8,7 @@ const handleSendEmail = require('./send');
 const handleDraftEmail = require('./draft');
 const handleMarkAsRead = require('./mark-as-read');
 const handleDeleteEmail = require('./delete');
+const handleDownloadAttachment = require('./download-attachment');
 
 // Email tool definitions
 const emailTools = [
@@ -91,6 +92,29 @@ const emailTools = [
       required: ["id"]
     },
     handler: handleReadEmail
+  },
+  {
+    name: "download-attachment",
+    description: "Downloads an email attachment to the local filesystem. Get attachment IDs from read-email output. Cloud-file links (reference attachments) return their URL instead.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        emailId: {
+          type: "string",
+          description: "ID of the email containing the attachment"
+        },
+        attachmentId: {
+          type: "string",
+          description: "ID of the attachment (shown in read-email output)"
+        },
+        savePath: {
+          type: "string",
+          description: "Where to save the file: an existing directory (attachment keeps its own name) or a full file path; parent folders are created if needed. Must be inside your home or temp directory and not target hidden files/folders. Default: ~/Downloads"
+        }
+      },
+      required: ["emailId", "attachmentId"]
+    },
+    handler: handleDownloadAttachment
   },
   {
     name: "send-email",
@@ -220,5 +244,6 @@ module.exports = {
   handleSendEmail,
   handleDraftEmail,
   handleMarkAsRead,
-  handleDeleteEmail
+  handleDeleteEmail,
+  handleDownloadAttachment
 };

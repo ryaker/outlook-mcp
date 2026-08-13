@@ -33,7 +33,8 @@ A comprehensive MCP (Model Context Protocol) server that connects Claude with Mi
 │   ├── search.js            # Search emails
 │   ├── read.js              # Read email
 │   ├── send.js              # Send email
-│   └── mark-as-read.js      # Mark email read/unread
+│   ├── mark-as-read.js      # Mark email read/unread
+│   └── download-attachment.js # Download email attachment
 ├── folder/                  # Folder functionality
 │   ├── index.js             # Folder exports
 │   ├── list.js              # List folders
@@ -83,7 +84,8 @@ A comprehensive MCP (Model Context Protocol) server that connects Claude with Mi
 |------|-------------|
 | `list-emails` | List recent emails from inbox |
 | `search-emails` | Search emails with filters |
-| `read-email` | Read email content |
+| `read-email` | Read email content (also lists attachment metadata) |
+| `download-attachment` | Downloads an email attachment to local disk; get attachment ids from read-email |
 | `send-email` | Send a new email |
 | `mark-as-read` | Mark email as read/unread |
 | `list-events` | List calendar events |
