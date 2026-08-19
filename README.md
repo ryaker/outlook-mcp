@@ -199,6 +199,9 @@ USE_TEST_MODE=false
 - Set `MS_TENANT_ID` for single-tenant apps to avoid `/common` endpoint errors
 - For Claude Desktop config, you'll use `OUTLOOK_CLIENT_ID` and `OUTLOOK_CLIENT_SECRET`
 - Always use the client secret **VALUE**, never the Secret ID
+- `MS_AUTH_SERVER_HOST` (optional) sets the interface the auth server binds to.
+  It defaults to `127.0.0.1`; set it to `0.0.0.0` only when running in a
+  container, as that exposes the OAuth callback to your whole network
 
 ### 2. Claude Desktop Configuration
 
