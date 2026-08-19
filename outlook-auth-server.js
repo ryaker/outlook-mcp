@@ -328,8 +328,12 @@ function exchangeCodeForTokens(code) {
 
 // Start server
 const PORT = 3333;
-server.listen(PORT, () => {
-  console.log(`Authentication server running at http://localhost:${PORT}`);
+// Bind to loopback by default: the OAuth redirect is delivered by a browser
+// on this same machine, so the server never needs to be reachable from the
+// network. Override (e.g. '0.0.0.0') only when running inside a container.
+const HOST = process.env.MS_AUTH_SERVER_HOST || '127.0.0.1';
+server.listen(PORT, HOST, () => {
+  console.log(`Authentication server running at http://${HOST}:${PORT}`);
   console.log(`Waiting for authentication callback at ${AUTH_CONFIG.redirectUri}`);
   console.log(`Token will be stored at: ${AUTH_CONFIG.tokenStorePath}`);
   
