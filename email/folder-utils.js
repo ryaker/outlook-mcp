@@ -21,13 +21,52 @@ const WELL_KNOWN_FOLDERS = {
   'archive': 'me/mailFolders/archive/messages'
 };
 
+/** Error code for a completed lookup that found no matching folder */
+const FOLDER_NOT_FOUND = 'FOLDER_NOT_FOUND';
+
+/**
+ * Escape a value for use inside a single-quoted OData string literal
+ * @param {string} value - Raw value
+ * @returns {string} - Escaped value
+ */
+function escapeODataString(value) {
+  return String(value).replace(/'/g, "''");
+}
+
+/**
+ * GET a collection and follow @odata.nextLink until all pages are read
+ * @param {string} accessToken - Access token
+ * @param {string} path - API path
+ * @param {object} queryParams - Query parameters for the first page
+ * @returns {Promise<Array>} - All items
+ */
+async function getAllPages(accessToken, path, queryParams) {
+  const items = [];
+  let url = path;
+  let params = queryParams;
+  while (url) {
+    const response = await callGraphAPI(accessToken, 'GET', url, null, params);
+    if (response && Array.isArray(response.value)) {
+      items.push(...response.value);
+    }
+    url = response && response['@odata.nextLink'];
+    params = {}; // nextLink already contains all parameters
+  }
+  return items;
+}
+
 /**
  * Resolve a folder name to its endpoint path
  * @param {string} accessToken - Access token
  * @param {string} folderName - Folder name to resolve
+ * @param {object} [options]
+ * @param {boolean} [options.strict=false] - Throw when the folder cannot be found
+ *   (error.code FOLDER_NOT_FOUND) or the lookup fails, instead of silently
+ *   falling back to the inbox
  * @returns {Promise<string>} - Resolved endpoint path
  */
-async function resolveFolderPath(accessToken, folderName) {
+async function resolveFolderPath(accessToken, folderName, options = {}) {
+  const { strict = false } = options;
 
   // Default to inbox if no folder specified
   if (!folderName) {
@@ -41,31 +80,48 @@ async function resolveFolderPath(accessToken, folderName) {
     return WELL_KNOWN_FOLDERS[lowerFolderName];
   }
 
+  let folderId = null;
   try {
-    // Try to find the folder by name
-    const folderId = await getFolderIdByName(accessToken, folderName);
-    if (folderId) {
-      const path = `me/mailFolders/${folderId}/messages`;
-      console.error(`Resolved folder "${folderName}" to path: ${path}`);
-      return path;
-    }
-
-    // If not found, fall back to inbox
-    console.error(`Couldn't find folder "${folderName}", falling back to inbox`);
-    return WELL_KNOWN_FOLDERS['inbox'];
+    // Try to find the folder by name, including nested subfolders
+    folderId = await getFolderIdByName(accessToken, folderName, { deep: true, strict });
   } catch (error) {
     console.error(`Error resolving folder "${folderName}": ${error.message}`);
+    if (strict) {
+      throw error;
+    }
     return WELL_KNOWN_FOLDERS['inbox'];
   }
+
+  if (folderId) {
+    const path = `me/mailFolders/${folderId}/messages`;
+    console.error(`Resolved folder "${folderName}" to path: ${path}`);
+    return path;
+  }
+
+  if (strict) {
+    const notFound = new Error(`Mail folder "${folderName}" not found`);
+    notFound.code = FOLDER_NOT_FOUND;
+    throw notFound;
+  }
+
+  // If not found, fall back to inbox
+  console.error(`Couldn't find folder "${folderName}", falling back to inbox`);
+  return WELL_KNOWN_FOLDERS['inbox'];
 }
 
 /**
  * Get the ID of a mail folder by its name
  * @param {string} accessToken - Access token
  * @param {string} folderName - Name of the folder to find
+ * @param {object} [options]
+ * @param {boolean} [options.deep=false] - Also search nested subfolders
+ *   (breadth-first) when no top-level folder matches
+ * @param {boolean} [options.strict=false] - Rethrow lookup failures instead of
+ *   returning null, so callers can tell a failed lookup from "not found"
  * @returns {Promise<string|null>} - Folder ID or null if not found
  */
-async function getFolderIdByName(accessToken, folderName) {
+async function getFolderIdByName(accessToken, folderName, options = {}) {
+  const { deep = false, strict = false } = options;
   try {
     // First try with exact match filter
     console.error(`Looking for folder with name "${folderName}"`);
@@ -74,7 +130,7 @@ async function getFolderIdByName(accessToken, folderName) {
       'GET',
       'me/mailFolders',
       null,
-      { $filter: `displayName eq '${folderName}'` }
+      { $filter: `displayName eq '${escapeODataString(folderName)}'` }
     );
     
     if (response.value && response.value.length > 0) {
@@ -84,17 +140,11 @@ async function getFolderIdByName(accessToken, folderName) {
     
     // If exact match fails, try to get all folders and do a case-insensitive comparison
     console.error(`No exact match found for "${folderName}", trying case-insensitive search`);
-    const allFoldersResponse = await callGraphAPI(
-      accessToken,
-      'GET',
-      'me/mailFolders',
-      null,
-      { $top: 100 }
-    );
+    const allFolders = await getAllPages(accessToken, 'me/mailFolders', { $top: 100 });
     
-    if (allFoldersResponse.value) {
+    if (allFolders.length > 0) {
       const lowerFolderName = folderName.toLowerCase();
-      const matchingFolder = allFoldersResponse.value.find(
+      const matchingFolder = allFolders.find(
         folder => folder.displayName.toLowerCase() === lowerFolderName
       );
       
@@ -102,14 +152,96 @@ async function getFolderIdByName(accessToken, folderName) {
         console.error(`Found case-insensitive match for "${folderName}" with ID: ${matchingFolder.id}`);
         return matchingFolder.id;
       }
+
+      if (deep) {
+        const nestedId = await findNestedFolderId(accessToken, allFolders, lowerFolderName, { strict });
+        if (nestedId) {
+          console.error(`Found nested folder "${folderName}" with ID: ${nestedId}`);
+          return nestedId;
+        }
+      }
     }
-    
+
     console.error(`No folder found matching "${folderName}"`);
     return null;
   } catch (error) {
     console.error(`Error finding folder "${folderName}": ${error.message}`);
+    if (strict) {
+      throw error;
+    }
     return null;
   }
+}
+
+/** Maximum folder depth searched below the top level */
+const MAX_FOLDER_DEPTH = 6;
+
+/**
+ * Maximum parallel child-folder requests. Exchange Online allows four
+ * concurrent requests per mailbox and answers 429 (MailboxConcurrency)
+ * above that, so stay below the limit.
+ */
+const MAX_CONCURRENT_REQUESTS = 3;
+
+/**
+ * Map items with an async function, running at most `limit` at a time
+ * @param {Array} items - Items to process
+ * @param {number} limit - Maximum concurrent calls
+ * @param {Function} fn - Async mapper
+ * @returns {Promise<Array>} - Results in input order
+ */
+async function mapWithConcurrency(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await fn(items[index]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+/**
+ * Breadth-first search through child folders for a case-insensitive name match
+ * @param {string} accessToken - Access token
+ * @param {Array} topLevelFolders - Already fetched top-level folders
+ * @param {string} lowerFolderName - Lower-cased folder name to find
+ * @param {object} [options]
+ * @param {boolean} [options.strict=false] - Rethrow child-folder request failures
+ * @returns {Promise<string|null>} - Folder ID or null if not found
+ */
+async function findNestedFolderId(accessToken, topLevelFolders, lowerFolderName, options = {}) {
+  const { strict = false } = options;
+  let level = topLevelFolders.filter(f => f.childFolderCount > 0);
+
+  for (let depth = 0; depth < MAX_FOLDER_DEPTH && level.length > 0; depth++) {
+    const children = (await mapWithConcurrency(level, MAX_CONCURRENT_REQUESTS, async (folder) => {
+      try {
+        return await getAllPages(
+          accessToken,
+          `me/mailFolders/${folder.id}/childFolders`,
+          { $top: 100, $select: 'id,displayName,childFolderCount' }
+        );
+      } catch (error) {
+        console.error(`Error getting child folders for "${folder.displayName}": ${error.message}`);
+        if (strict) {
+          throw error;
+        }
+        return [];
+      }
+    })).flat();
+
+    const match = children.find(f => f.displayName && f.displayName.toLowerCase() === lowerFolderName);
+    if (match) {
+      return match.id;
+    }
+
+    level = children.filter(f => f.childFolderCount > 0);
+  }
+
+  return null;
 }
 
 /**
@@ -169,6 +301,7 @@ async function getAllFolders(accessToken) {
 
 module.exports = {
   WELL_KNOWN_FOLDERS,
+  FOLDER_NOT_FOUND,
   resolveFolderPath,
   getFolderIdByName,
   getAllFolders
