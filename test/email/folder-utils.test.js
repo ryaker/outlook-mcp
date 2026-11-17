@@ -214,3 +214,59 @@ describe('getFolderIdByName', () => {
     expect(callGraphAPI).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('nested folder lookup', () => {
+  const mockAccessToken = 'dummy_access_token';
+
+  beforeEach(() => {
+    callGraphAPI.mockReset();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    console.error.mockRestore();
+  });
+
+  test('getFolderIdByName with deep finds a nested subfolder', async () => {
+    callGraphAPI
+      .mockResolvedValueOnce({ value: [] }) // exact top-level match
+      .mockResolvedValueOnce({ value: [{ id: 'top', displayName: 'wemPro', childFolderCount: 1 }] })
+      .mockResolvedValueOnce({ value: [{ id: 'nested', displayName: 'Suppliers WP', childFolderCount: 0 }] });
+
+    const result = await getFolderIdByName(mockAccessToken, 'suppliers wp', { deep: true });
+
+    expect(result).toBe('nested');
+    expect(callGraphAPI.mock.calls[2][2]).toBe('me/mailFolders/top/childFolders');
+  });
+
+  test('getFolderIdByName without deep does not search subfolders', async () => {
+    callGraphAPI
+      .mockResolvedValueOnce({ value: [] })
+      .mockResolvedValueOnce({ value: [{ id: 'top', displayName: 'wemPro', childFolderCount: 1 }] });
+
+    const result = await getFolderIdByName(mockAccessToken, 'Suppliers WP');
+
+    expect(result).toBeNull();
+    expect(callGraphAPI).toHaveBeenCalledTimes(2);
+  });
+
+  test('resolveFolderPath resolves a nested folder', async () => {
+    callGraphAPI
+      .mockResolvedValueOnce({ value: [] })
+      .mockResolvedValueOnce({ value: [{ id: 'top', displayName: 'wemPro', childFolderCount: 1 }] })
+      .mockResolvedValueOnce({ value: [{ id: 'nested', displayName: 'Suppliers WP', childFolderCount: 0 }] });
+
+    const result = await resolveFolderPath(mockAccessToken, 'Suppliers WP');
+
+    expect(result).toBe('me/mailFolders/nested/messages');
+  });
+
+  test('resolveFolderPath in strict mode throws when the folder is missing', async () => {
+    callGraphAPI
+      .mockResolvedValueOnce({ value: [] })
+      .mockResolvedValueOnce({ value: [] });
+
+    await expect(resolveFolderPath(mockAccessToken, 'Nope', { strict: true }))
+      .rejects.toThrow('Mail folder "Nope" not found');
+  });
+});

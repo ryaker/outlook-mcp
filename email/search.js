@@ -11,8 +11,11 @@ const { resolveFolderPath } = require('./folder-utils');
  * @param {object} args - Tool arguments
  * @returns {object} - MCP response
  */
+/** Endpoint used when no folder is given: every folder in the mailbox */
+const WHOLE_MAILBOX_ENDPOINT = 'me/messages';
+
 async function handleSearchEmails(args) {
-  const folder = args.folder || "inbox";
+  const folder = args.folder || '';
   const requestedCount = args.count || 10;
   const query = args.query || '';
   const from = args.from || '';
@@ -25,9 +28,23 @@ async function handleSearchEmails(args) {
     // Get access token
     const accessToken = await ensureAuthenticated();
     
-    // Resolve the folder path
-    const endpoint = await resolveFolderPath(accessToken, folder);
-    console.error(`Using endpoint: ${endpoint} for folder: ${folder}`);
+    // Without a folder, search the whole mailbox. With a folder, resolve it
+    // strictly (including subfolders) so an unknown name is reported instead
+    // of silently searching the inbox.
+    let endpoint = WHOLE_MAILBOX_ENDPOINT;
+    if (folder) {
+      try {
+        endpoint = await resolveFolderPath(accessToken, folder, { strict: true });
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: `Folder "${folder}" not found. Use 'list-folders' to see the available folders, or leave 'folder' empty to search the whole mailbox.`
+          }]
+        };
+      }
+    }
+    console.error(`Using endpoint: ${endpoint} for folder: ${folder || '(whole mailbox)'}`);
     
     // Execute progressive search with pagination
     const response = await progressiveSearch(
@@ -132,8 +149,10 @@ async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms
     }
   }
   
-  // 3. Try with only boolean filters
-  if (filterTerms.hasAttachments === true || filterTerms.unreadOnly === true) {
+  // 3. Try with only boolean filters, but only when no search terms were given.
+  // Otherwise this would return unrelated emails as if they matched.
+  const hasSearchTerms = ['query', 'from', 'to', 'subject'].some(term => searchTerms[term]);
+  if (!hasSearchTerms && (filterTerms.hasAttachments === true || filterTerms.unreadOnly === true)) {
     try {
       console.error("Attempting search with only boolean filters");
       searchAttempts.push("boolean-filters-only");
@@ -155,28 +174,18 @@ async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms
     }
   }
   
-  // 4. Final fallback: just get recent emails with pagination
-  console.error("All search strategies failed, falling back to recent emails");
-  searchAttempts.push("recent-emails");
-  
-  const basicParams = {
-    $top: Math.min(50, maxCount),
-    $select: config.EMAIL_SELECT_FIELDS,
-    $orderby: 'receivedDateTime desc'
+  // 4. Nothing matched. Do not substitute unrelated recent emails: report
+  // an empty result so callers know the search found nothing.
+  console.error(`No results after strategies: ${searchAttempts.join(', ')}`);
+  return {
+    value: [],
+    _searchInfo: {
+      attemptsCount: searchAttempts.length,
+      strategies: searchAttempts,
+      originalTerms: searchTerms,
+      filterTerms: filterTerms
+    }
   };
-  
-  const response = await callGraphAPIPaginated(accessToken, 'GET', endpoint, basicParams, maxCount);
-  console.error(`Fallback to recent emails found ${response.value?.length || 0} results`);
-  
-  // Add a note to the response about the search attempts
-  response._searchInfo = {
-    attemptsCount: searchAttempts.length,
-    strategies: searchAttempts,
-    originalTerms: searchTerms,
-    filterTerms: filterTerms
-  };
-  
-  return response;
 }
 
 /**
@@ -290,18 +299,14 @@ function formatSearchResults(response) {
     return `${index + 1}. ${readStatus}${date} - From: ${sender.name} (${sender.address})\nSubject: ${email.subject}\nID: ${email.id}\n`;
   }).join("\n");
   
-  // Add search strategy info if available
-  let additionalInfo = '';
-  if (response._searchInfo) {
-    additionalInfo = `\n(Search used ${response._searchInfo.strategies[response._searchInfo.strategies.length - 1]} strategy)`;
-  }
-  
   return {
-    content: [{ 
-      type: "text", 
-      text: `Found ${response.value.length} emails matching your search criteria:${additionalInfo}\n\n${emailList}`
+    content: [{
+      type: "text",
+      text: `Found ${response.value.length} emails matching your search criteria:\n\n${emailList}`
     }]
   };
 }
 
 module.exports = handleSearchEmails;
+module.exports.progressiveSearch = progressiveSearch;
+module.exports.WHOLE_MAILBOX_ENDPOINT = WHOLE_MAILBOX_ENDPOINT;

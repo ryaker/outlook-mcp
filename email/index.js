@@ -42,7 +42,7 @@ const emailTools = [
         },
         folder: {
           type: "string",
-          description: "Email folder to search in (default: 'inbox')"
+          description: "Email folder to search in, including nested subfolders (default: the whole mailbox)"
         },
         from: {
           type: "string",
