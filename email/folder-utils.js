@@ -177,6 +177,33 @@ async function getFolderIdByName(accessToken, folderName, options = {}) {
 const MAX_FOLDER_DEPTH = 6;
 
 /**
+ * Maximum parallel child-folder requests. Exchange Online allows four
+ * concurrent requests per mailbox and answers 429 (MailboxConcurrency)
+ * above that, so stay below the limit.
+ */
+const MAX_CONCURRENT_REQUESTS = 3;
+
+/**
+ * Map items with an async function, running at most `limit` at a time
+ * @param {Array} items - Items to process
+ * @param {number} limit - Maximum concurrent calls
+ * @param {Function} fn - Async mapper
+ * @returns {Promise<Array>} - Results in input order
+ */
+async function mapWithConcurrency(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await fn(items[index]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+/**
  * Breadth-first search through child folders for a case-insensitive name match
  * @param {string} accessToken - Access token
  * @param {Array} topLevelFolders - Already fetched top-level folders
@@ -190,7 +217,7 @@ async function findNestedFolderId(accessToken, topLevelFolders, lowerFolderName,
   let level = topLevelFolders.filter(f => f.childFolderCount > 0);
 
   for (let depth = 0; depth < MAX_FOLDER_DEPTH && level.length > 0; depth++) {
-    const children = (await Promise.all(level.map(async (folder) => {
+    const children = (await mapWithConcurrency(level, MAX_CONCURRENT_REQUESTS, async (folder) => {
       try {
         return await getAllPages(
           accessToken,
@@ -204,7 +231,7 @@ async function findNestedFolderId(accessToken, topLevelFolders, lowerFolderName,
         }
         return [];
       }
-    }))).flat();
+    })).flat();
 
     const match = children.find(f => f.displayName && f.displayName.toLowerCase() === lowerFolderName);
     if (match) {

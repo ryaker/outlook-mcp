@@ -327,4 +327,25 @@ describe('nested folder lookup', () => {
 
     expect(error.code).toBe(FOLDER_NOT_FOUND);
   });
+  test('limits concurrent child folder requests to stay under the mailbox limit', async () => {
+    const parents = Array.from({ length: 8 }, (_, i) => ({ id: `p${i}`, displayName: `P${i}`, childFolderCount: 1 }));
+    let active = 0;
+    let peak = 0;
+    callGraphAPI.mockImplementation(async (token, method, path) => {
+      if (!path.includes('childFolders')) {
+        return { value: path === 'me/mailFolders' && callGraphAPI.mock.calls.length === 1 ? [] : parents };
+      }
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise(resolve => setTimeout(resolve, 5));
+      active--;
+      return { value: [] };
+    });
+
+    const result = await getFolderIdByName(mockAccessToken, 'Missing', { deep: true });
+
+    expect(result).toBeNull();
+    expect(peak).toBeLessThanOrEqual(3);
+    expect(callGraphAPI.mock.calls.filter(c => c[2].includes('childFolders'))).toHaveLength(8);
+  });
 });
