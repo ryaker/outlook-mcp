@@ -4,7 +4,7 @@
 const config = require('../config');
 const { callGraphAPI, callGraphAPIPaginated } = require('../utils/graph-api');
 const { ensureAuthenticated } = require('../auth');
-const { resolveFolderPath } = require('./folder-utils');
+const { resolveFolderPath, FOLDER_NOT_FOUND } = require('./folder-utils');
 
 /**
  * Search emails handler
@@ -36,12 +36,10 @@ async function handleSearchEmails(args) {
       try {
         endpoint = await resolveFolderPath(accessToken, folder, { strict: true });
       } catch (error) {
-        return {
-          content: [{
-            type: "text",
-            text: `Folder "${folder}" not found. Use 'list-folders' to see the available folders, or leave 'folder' empty to search the whole mailbox.`
-          }]
-        };
+        const text = error.code === FOLDER_NOT_FOUND
+          ? `Folder "${folder}" not found. Use 'list-folders' to see the available folders, or leave 'folder' empty to search the whole mailbox.`
+          : `Could not look up folder "${folder}": ${error.message}`;
+        return { content: [{ type: "text", text }] };
       }
     }
     console.error(`Using endpoint: ${endpoint} for folder: ${folder || '(whole mailbox)'}`);
@@ -87,8 +85,12 @@ async function handleSearchEmails(args) {
  * @returns {Promise<object>} - Search results
  */
 async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms, maxCount) {
-  // Track search strategies attempted
+  // Track search strategies attempted, and whether any request completed.
+  // If every request failed, the search must report an error instead of
+  // "no emails found".
   const searchAttempts = [];
+  let anySucceeded = false;
+  let lastError = null;
   
   // 1. Try combined search (most specific)
   try {
@@ -97,12 +99,14 @@ async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms
     searchAttempts.push("combined-search");
     
     const response = await callGraphAPIPaginated(accessToken, 'GET', endpoint, params, maxCount);
+    anySucceeded = true;
     if (response.value && response.value.length > 0) {
       console.error(`Combined search successful: found ${response.value.length} results`);
       return response;
     }
   } catch (error) {
     console.error(`Combined search failed: ${error.message}`);
+    lastError = error;
   }
   
   // 2. Try each search term individually, starting with most specific
@@ -139,12 +143,14 @@ async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms
         simplifiedParams.$search = `"${kqlParts.join(' ')}"`;
         
         const response = await callGraphAPIPaginated(accessToken, 'GET', endpoint, simplifiedParams, maxCount);
+        anySucceeded = true;
         if (response.value && response.value.length > 0) {
           console.error(`Search with ${term} successful: found ${response.value.length} results`);
           return response;
         }
       } catch (error) {
         console.error(`Search with ${term} failed: ${error.message}`);
+        lastError = error;
       }
     }
   }
@@ -171,10 +177,16 @@ async function progressiveSearch(endpoint, accessToken, searchTerms, filterTerms
       return response;
     } catch (error) {
       console.error(`Boolean filter search failed: ${error.message}`);
+      lastError = error;
     }
   }
   
-  // 4. Nothing matched. Do not substitute unrelated recent emails: report
+  // 4. Every request failed: report the failure, not an empty result.
+  if (!anySucceeded && lastError) {
+    throw new Error(`Search failed: ${lastError.message}`);
+  }
+
+  // 5. Nothing matched. Do not substitute unrelated recent emails: report
   // an empty result so callers know the search found nothing.
   console.error(`No results after strategies: ${searchAttempts.join(', ')}`);
   return {

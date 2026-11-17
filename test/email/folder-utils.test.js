@@ -1,7 +1,8 @@
 const {
   WELL_KNOWN_FOLDERS,
   resolveFolderPath,
-  getFolderIdByName
+  getFolderIdByName,
+  FOLDER_NOT_FOUND
 } = require('../../email/folder-utils');
 const { callGraphAPI } = require('../../utils/graph-api');
 
@@ -230,10 +231,10 @@ describe('nested folder lookup', () => {
   test('getFolderIdByName with deep finds a nested subfolder', async () => {
     callGraphAPI
       .mockResolvedValueOnce({ value: [] }) // exact top-level match
-      .mockResolvedValueOnce({ value: [{ id: 'top', displayName: 'wemPro', childFolderCount: 1 }] })
-      .mockResolvedValueOnce({ value: [{ id: 'nested', displayName: 'Suppliers WP', childFolderCount: 0 }] });
+      .mockResolvedValueOnce({ value: [{ id: 'top', displayName: 'Projects', childFolderCount: 1 }] })
+      .mockResolvedValueOnce({ value: [{ id: 'nested', displayName: 'Suppliers', childFolderCount: 0 }] });
 
-    const result = await getFolderIdByName(mockAccessToken, 'suppliers wp', { deep: true });
+    const result = await getFolderIdByName(mockAccessToken, 'suppliers', { deep: true });
 
     expect(result).toBe('nested');
     expect(callGraphAPI.mock.calls[2][2]).toBe('me/mailFolders/top/childFolders');
@@ -242,9 +243,9 @@ describe('nested folder lookup', () => {
   test('getFolderIdByName without deep does not search subfolders', async () => {
     callGraphAPI
       .mockResolvedValueOnce({ value: [] })
-      .mockResolvedValueOnce({ value: [{ id: 'top', displayName: 'wemPro', childFolderCount: 1 }] });
+      .mockResolvedValueOnce({ value: [{ id: 'top', displayName: 'Projects', childFolderCount: 1 }] });
 
-    const result = await getFolderIdByName(mockAccessToken, 'Suppliers WP');
+    const result = await getFolderIdByName(mockAccessToken, 'Suppliers');
 
     expect(result).toBeNull();
     expect(callGraphAPI).toHaveBeenCalledTimes(2);
@@ -253,10 +254,10 @@ describe('nested folder lookup', () => {
   test('resolveFolderPath resolves a nested folder', async () => {
     callGraphAPI
       .mockResolvedValueOnce({ value: [] })
-      .mockResolvedValueOnce({ value: [{ id: 'top', displayName: 'wemPro', childFolderCount: 1 }] })
-      .mockResolvedValueOnce({ value: [{ id: 'nested', displayName: 'Suppliers WP', childFolderCount: 0 }] });
+      .mockResolvedValueOnce({ value: [{ id: 'top', displayName: 'Projects', childFolderCount: 1 }] })
+      .mockResolvedValueOnce({ value: [{ id: 'nested', displayName: 'Suppliers', childFolderCount: 0 }] });
 
-    const result = await resolveFolderPath(mockAccessToken, 'Suppliers WP');
+    const result = await resolveFolderPath(mockAccessToken, 'Suppliers');
 
     expect(result).toBe('me/mailFolders/nested/messages');
   });
@@ -268,5 +269,62 @@ describe('nested folder lookup', () => {
 
     await expect(resolveFolderPath(mockAccessToken, 'Nope', { strict: true }))
       .rejects.toThrow('Mail folder "Nope" not found');
+  });
+  test('escapes apostrophes in the folder name filter', async () => {
+    callGraphAPI.mockResolvedValueOnce({ value: [{ id: 'f1', displayName: "Client's" }] });
+
+    await getFolderIdByName(mockAccessToken, "Client's");
+
+    expect(callGraphAPI.mock.calls[0][4].$filter).toBe("displayName eq 'Client''s'");
+  });
+
+  test('follows nextLink pages of top-level and child folders', async () => {
+    callGraphAPI
+      .mockResolvedValueOnce({ value: [] }) // exact top-level match
+      .mockResolvedValueOnce({
+        value: [{ id: 'a', displayName: 'A', childFolderCount: 0 }],
+        '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/mailFolders?$skip=100'
+      })
+      .mockResolvedValueOnce({ value: [{ id: 'top', displayName: 'Projects', childFolderCount: 1 }] })
+      .mockResolvedValueOnce({
+        value: [{ id: 'c1', displayName: 'Other', childFolderCount: 0 }],
+        '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/mailFolders/top/childFolders?$skip=100'
+      })
+      .mockResolvedValueOnce({ value: [{ id: 'nested', displayName: 'Suppliers', childFolderCount: 0 }] });
+
+    const result = await getFolderIdByName(mockAccessToken, 'Suppliers', { deep: true });
+
+    expect(result).toBe('nested');
+    expect(callGraphAPI.mock.calls[2][2]).toContain('$skip=100');
+    expect(callGraphAPI.mock.calls[4][2]).toContain('childFolders?$skip=100');
+  });
+
+  test('strict mode propagates lookup failures instead of reporting not found', async () => {
+    callGraphAPI.mockRejectedValueOnce(new Error('Graph API error 503'));
+
+    const error = await resolveFolderPath(mockAccessToken, 'Projects', { strict: true }).catch(e => e);
+
+    expect(error.message).toBe('Graph API error 503');
+    expect(error.code).toBeUndefined();
+  });
+
+  test('strict mode propagates child folder request failures', async () => {
+    callGraphAPI
+      .mockResolvedValueOnce({ value: [] })
+      .mockResolvedValueOnce({ value: [{ id: 'top', displayName: 'Projects', childFolderCount: 1 }] })
+      .mockRejectedValueOnce(new Error('Graph API error 429'));
+
+    await expect(resolveFolderPath(mockAccessToken, 'Suppliers', { strict: true }))
+      .rejects.toThrow('Graph API error 429');
+  });
+
+  test('strict mode marks a missing folder with FOLDER_NOT_FOUND', async () => {
+    callGraphAPI
+      .mockResolvedValueOnce({ value: [] })
+      .mockResolvedValueOnce({ value: [] });
+
+    const error = await resolveFolderPath(mockAccessToken, 'Nope', { strict: true }).catch(e => e);
+
+    expect(error.code).toBe(FOLDER_NOT_FOUND);
   });
 });
